@@ -6,11 +6,11 @@ from sklearn.model_selection import train_test_split, KFold, GridSearchCV, valid
 from sklearn.neural_network import MLPRegressor as MLPR
 from sklearn.tree import DecisionTreeRegressor as DTR
 from sklearn.neighbors import KNeighborsRegressor as KNR
-from sklearn.linear_model import LinearRegression as LR
 from sklearn.linear_model import SGDRegressor as SGDR
 from sklearn.linear_model import TweedieRegressor as TR
 from sklearn.metrics import mean_tweedie_deviance, make_scorer
 from sklearn import svm
+from sklearn import metrics
 from sklearn.decomposition import PCA
 import pandas as pd
 
@@ -73,7 +73,7 @@ def val_curve(estim,score,estim_name,params,x,y):
     params=params[0]
     for key in params:
       if key=='alpha':
-        param_range= np.logspace(-3, 6, 9)
+        param_range= np.logspace(-5, 6, 11)
 #        param_range= np.array([0,.01,.02,.04,.08,.1,.3,.7,1,2,5])
 #        param_range= np.array(params[key])
         train_scores,test_scores=validation_curve(
@@ -198,8 +198,13 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names):
     print('  Test set size: ',x_test.shape[0],'\n')
 # Set the parameters by cross-validation
 #    tweedie_deviance=make_scorer(mean_tweedie_deviance,power=2)
-    scores=['explained_variance','r2']
+    scores=['explained_variance','r2','neg_mean_squared_error','neg_mean_absolute_error']
     estim_name=estimator.__class__.__name__
+#    if estim_name=='LogisticRegression':
+#        tuned_parameters = [{'penalty': ['none'], 'C': [.05,0.3,.5,.7,.9,1,5,10]},
+#        {'penalty': ['l2'], 'C': [.05,0.3,.5,.7,.9,1,5,10]},
+#        {'penalty': ['l1'], 'C': [.05,0.3,.5,.7,.9,1,5,10]},
+#        {'penalty': ['elasticnet'], 'C': [.05,0.3,.5,.7,.9,1,5,10]}]
     if estim_name=='SVR':
         tuned_parameters = [{'kernel': ['rbf'], 'gamma': ['scale', 'auto'], 'C': [1, 10, 100, 1000]},
                     {'kernel': ['linear'], 'gamma': ['scale', 'auto'], 'C': [.1,1, 10, 100]},
@@ -229,20 +234,21 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names):
 #        {'algorithm': ['auto'], 'p': [1,2,7], 'n_neighbors': [2,5,7,11]}]
     elif estim_name=='DecisionTreeRegressor':
 # Evaluate, in case of Decision Tree, the feature importances
-        dtr = estimator.fit(x_train,y_train)
-        importances = dtr.feature_importances_
-        dtr_importances = pd.Series(importances, index=feat_names)
-        dtr_importances.plot.bar()
-        lab_site=[]
-        lab=[]
-        for i in range(len(importances)):
-            if importances[i] > 0.01:
-                lab_site.append(i)
-                lab.append(feat_names[i])
-        plt.ylabel("Mean decrease in impurity")
-        plt.xticks(lab_site,lab,rotation=0)
-        plt.savefig('dtr_feat_importances.png')
-        plt.close()
+        if feat_names != False:
+            dtr = estimator.fit(x_train,y_train)
+            importances = dtr.feature_importances_
+            dtr_importances = pd.Series(importances, index=feat_names)
+            dtr_importances.plot.bar()
+            lab_site=[]
+            lab=[]
+            for i in range(len(importances)):
+                if importances[i] > 0.01:
+                    lab_site.append(i)
+                    lab.append(feat_names[i])
+            plt.ylabel("Mean decrease in impurity")
+            plt.xticks(lab_site,lab,rotation=0)
+            plt.savefig('dtr_feat_importances.png')
+            plt.close()
         tuned_parameters = [{'splitter': ['best'],
             'criterion': ['mse','friedman_mse','mae','poisson']},
         {'splitter': ['random'],
@@ -267,11 +273,11 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names):
         results_df = pd.DataFrame(clf.cv_results_)
         results_df = results_df.sort_values(by=['rank_test_score'])
         results_df = (results_df.set_index(results_df["params"].apply(
-            lambda x: "_".join(str(val) for val in x.values()))))
+            lambda v: "_".join(str(val) for val in v.values()))))
         print(results_df[['mean_test_score','std_test_score']].head(1))
         print('Scoring function applied to test set of dimension:',
                 round(clf.score(x_test,y_test),4),'\n')
-        print(clf.predict(x_test), y_test)
+#        print(clf.predict(x_test), y_test)
 # Validation curve
         if estim_name=='MLPRegressor':
             val_curve(estimator,score,estim_name,tuned_parameters,x,y)
@@ -294,21 +300,27 @@ def trainmod(x,y,feat_names):
 # Create StandardScaler instance
     sscaler=StandardScaler()
 # Create train and test sets from the original dataset
-    x_train, x_test, y_train, y_test = train_test_split(x, y,test_size=0.15, random_state=42)
+    x_train, x_test, y_train, y_test = train_test_split(x, y,test_size=0.33, random_state=42)
 # Perform standard scaling; fit only on the training set
     x_train=sscaler.fit_transform(x_train)
+# Scale x
+    x=sscaler.fit_transform(x)
 # Trasform both training and test
     x_test=sscaler.transform(x_test)
 # Create instance of PCA, requesting to reach a 95% of explained variance
-##    pca=PCA(.99)
+    pca=PCA(.9999)
 # Fit training set only
-##    x_train=pca.fit_transform(x_train)
+    x_train=pca.fit_transform(x_train)
 # Transform both training and test sets
-##    x_test=pca.transform(x_test)
+    x_test=pca.transform(x_test)
+    print('\n-> Applied feature reduction PCA')
+    print('  Reduced from ',x.shape[1],' to ',x_train.shape[1],' features')
+
     print('\n-> Tuning hyperparameters:')
     estimators_list= []
+    estimators_list.append(SGDR())
     estimators_list.append(svm.SVR())
-#    estimators_list.append(KNR())
+    estimators_list.append(KNR())
     estimators_list.append(DTR(random_state=42))
     estimators_list.append(MLPR(random_state=42,max_iter=10000))
     estimators_list.append(TR(power=0,max_iter=20000,alpha=.01))

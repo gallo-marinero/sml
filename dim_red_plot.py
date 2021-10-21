@@ -1,5 +1,6 @@
 import numpy as np
 from sklearn.decomposition import PCA
+from umap import UMAP
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
 # Perform PCA component analysis
@@ -30,4 +31,21 @@ def pca_feat(x,crit,v):
 
     plt.savefig('explainedvar_pca.png')
     plt.clf()
+
+def umap(x,y):
+    print('\n-> Applying UMAP dimensionality reduction')
+#    plt.title(title)
+    umap=UMAP(random_state=42)
+    umap_data=umap.fit_transform(x)
+    plt.figure(figsize=(4, 4), dpi=300)
+    plt.scatter(umap_data[:, 0], umap_data[:, 1], s=9,
+            c=y, alpha=.6)
+    plt.xlabel('UMAP1')
+    plt.ylabel('UMAP2')
+# It could be interesting to label the different structures here
+#                label=list(structure_features.keys())[i])
+#    plt.text(min(dat_reduced[:, 0])-.2,max(dat_reduced[:, 1])-.5,'Outlier', color=colors[0])
+#    plt.text(min(dat_reduced[:, 0])-.2,max(dat_reduced[:, 1])-1.5,'Inlier', color=colors[1])
+    plt.savefig('umap.png')
+    plt.show()
 
