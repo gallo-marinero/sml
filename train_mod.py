@@ -68,7 +68,6 @@ def l_curve(estim,score,estim_name,params,x,y):
 #    plt.show()
 
 def val_curve(estim,score,estim_name,params,x,y):
-    print(' - Calculating validation curve for '+estim_name+'\n')
 # Extract list to dict
     params=params[0]
     for key in params:
@@ -76,8 +75,8 @@ def val_curve(estim,score,estim_name,params,x,y):
         param_range= np.logspace(-5, 6, 11)
 #        param_range= np.array([0,.01,.02,.04,.08,.1,.3,.7,1,2,5])
 #        param_range= np.array(params[key])
-        train_scores,test_scores=validation_curve(
-        estim,x,y,param_name=key,param_range=param_range)#,scoring=score)
+        train_scores,test_scores=validation_curve(estim,x,y,param_name=key,
+                param_range=param_range,scoring=score)
 # Print
         train_scores_mean = np.mean(train_scores, axis=1)
         train_scores_std = np.std(train_scores, axis=1)
@@ -86,7 +85,7 @@ def val_curve(estim,score,estim_name,params,x,y):
 
         plt.title('Validation Curve with '+estim_name)
         plt.xlabel(r'$\alpha$')
-        plt.ylabel('Score')
+        plt.ylabel(score)
         lw = 2
         plt.semilogx(param_range, train_scores_mean, label="Training score",
 #        plt.plot(param_range, train_scores_mean, label="Training score",
@@ -101,7 +100,7 @@ def val_curve(estim,score,estim_name,params,x,y):
                  test_scores_mean + test_scores_std, alpha=0.2,
                  color="navy", lw=lw)
         plt.legend(loc="best")
-        plt.savefig(estim_name+'_vc.png')
+        plt.savefig(estim_name+'_'+score+'_vc.png')
         plt.clf()
 #        plt.show()
 
@@ -162,7 +161,7 @@ def bayesian_test(results_df,x,y):
 
     better_prob = 1 - t_post.cdf(0)
 
-    print(' - Bayesian analysis')
+    print('   - Bayesian analysis')
     print(f" Probability of {model_scores.index[0]} being more accurate than "
       f"{model_scores.index[1]}: {better_prob:.3f}")
     print(f" Probability of {model_scores.index[1]} being more accurate than "
@@ -193,12 +192,15 @@ def covar_print(results_df,score,estim_name):
     print(f"Correlation of models:\n {model_scores.transpose().corr()}")
 
 def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names):
-    print('\n  Total set size: ',x.shape[0])
+    print('\n  Set with',x.shape[0],'samples and ',x.shape[1],'features')
     print('  Training set size: ',x_train.shape[0])
     print('  Test set size: ',x_test.shape[0],'\n')
+    print('  ~~~ Tuning of the parameters ~~~')
+    print('   Validation curves calculated for each scoring function')
 # Set the parameters by cross-validation
-#    tweedie_deviance=make_scorer(mean_tweedie_deviance,power=2)
-    scores=['explained_variance','r2','neg_mean_squared_error','neg_mean_absolute_error']
+    nonneg=['explained_variance','max_error','r2']
+    neg=['neg_mean_absolute_error','neg_mean_squared_error','neg_root_mean_squared_error','neg_mean_squared_log_error','neg_median_absolute_error','neg_mean_gamma_deviance','neg_mean_absolute_percentage_error']
+    scores=nonneg+neg
     estim_name=estimator.__class__.__name__
 #    if estim_name=='LogisticRegression':
 #        tuned_parameters = [{'penalty': ['none'], 'C': [.05,0.3,.5,.7,.9,1,5,10]},
@@ -223,12 +225,12 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names):
                         1e-4, 1e-3, 1e-2,.1,1],
                         'learning_rate': ['constant','optimal','invscaling','adaptive']}]
     elif estim_name=='TweedieRegressor':
-        tuned_parameters = [{'alpha': [.05,0.3,.5,.7,.9,1,5,10]}]
+        tuned_parameters = [{'alpha': [.001,.005,.01,.05,0.3,.5,.7,.9,1,5,10]}]
 #        {'power': [1], 'link':['log'],'alpha': [0.3,.5,.7,.9,1,5,10]},
 #        {'power': [2], 'alpha': [0.3,.5,.7,.9,1,5,10]},
 #        {'power': [3], 'alpha': [0.3,.5,.7,.9,1,5,10]}]
     elif estim_name=='KNeighborsRegressor':
-         tuned_parameters = [{'algorithm': ['auto'], 'p': [1,2,7], 'n_neighbors': [1,2,5,7,11]}]
+         tuned_parameters = [{'algorithm': ['auto'], 'p': [1,2,7], 'n_neighbors': [2,5,7,11]}]
 #        {'algorithm': ['ball_tree'],'p': [1,2,7], 'n_neighbors': [2,5,7,11]},
 #        {'algorithm': ['kd_tree'], 'p': [1,2,7], 'n_neighbors': [2,5,7,11]},
 #        {'algorithm': ['auto'], 'p': [1,2,7], 'n_neighbors': [2,5,7,11]}]
@@ -250,9 +252,9 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names):
             plt.savefig('dtr_feat_importances.png')
             plt.close()
         tuned_parameters = [{'splitter': ['best'],
-            'criterion': ['mse','friedman_mse','mae','poisson']},
+            'criterion': ['squared_error','friedman_mse','absolute_error','poisson']},
         {'splitter': ['random'],
-            'criterion': ['mse','friedman_mse','mae','poisson']}]
+            'criterion': ['squared_error','friedman_mse','absolute_error','poisson']}]
     elif estim_name=='MLPRegressor':
         tuned_parameters = [
         {'solver':['lbfgs'],
@@ -260,26 +262,25 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names):
         {'solver':['adam'],
             'alpha': [0,.001,.005,.01,.05,.1,.5,1,5,10]}]
 
-    print(' ',estim_name,'- Best set found for',':')
-    print('  ---------------------------------')
     for score in scores:
 # Declare the GridSearchCV strategy
         clf = GridSearchCV(estimator, tuned_parameters, scoring=score)
         clf.fit(x_train, y_train)
-# Print results
-        print('\n   ~',score,'~')
 # Prepare the dataframe with results, to print the mean and standard deviation
 # of the test score for the best set of parameters
         results_df = pd.DataFrame(clf.cv_results_)
         results_df = results_df.sort_values(by=['rank_test_score'])
         results_df = (results_df.set_index(results_df["params"].apply(
             lambda v: "_".join(str(val) for val in v.values()))))
+# Print results
+        if score in neg:
+            print('\n ·',score,':',-round(clf.score(x_test,y_test),4))
+        elif score in nonneg:
+            print('\n ·',score,':',round(clf.score(x_test,y_test),4))
         print(results_df[['mean_test_score','std_test_score']].head(1))
-        print('Scoring function applied to test set of dimension:',
-                round(clf.score(x_test,y_test),4),'\n')
 #        print(clf.predict(x_test), y_test)
 # Validation curve
-        if estim_name=='MLPRegressor':
+        if estim_name=='TweedieRegressor':
             val_curve(estimator,score,estim_name,tuned_parameters,x,y)
 # Learning curve
         l_curve(estimator,score,estim_name,tuned_parameters,x,y)
@@ -299,35 +300,47 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names):
 def trainmod(x,y,feat_names):
 # Create StandardScaler instance
     sscaler=StandardScaler()
-# Create train and test sets from the original dataset
-    x_train, x_test, y_train, y_test = train_test_split(x, y,test_size=0.33, random_state=42)
-# Perform standard scaling; fit only on the training set
-    x_train=sscaler.fit_transform(x_train)
 # Scale x
     x=sscaler.fit_transform(x)
+# Create train and test sets from the original dataset
+    x_train, x_test, y_train, y_test = train_test_split(x, y, random_state=42)
+# Perform standard scaling; fit only on the training set
+##    x_train=sscaler.fit_transform(x_train)
+# Scale x
+##    x=sscaler.fit_transform(x)
 # Trasform both training and test
-    x_test=sscaler.transform(x_test)
+##    x_test=sscaler.transform(x_test)
 # Create instance of PCA, requesting to reach a 95% of explained variance
-    pca=PCA(.9999)
+##    pca=PCA(.9999)
 # Fit training set only
-    x_train=pca.fit_transform(x_train)
+##    x_train=pca.fit_transform(x_train)
 # Transform both training and test sets
-    x_test=pca.transform(x_test)
-    print('\n-> Applied feature reduction PCA')
-    print('  Reduced from ',x.shape[1],' to ',x_train.shape[1],' features')
+##    x_test=pca.transform(x_test)
+#    print('\n-> Applied feature reduction PCA')
+#    print('  Reduced from ',x.shape[1],' to ',x_train.shape[1],' features')
 
-    print('\n-> Tuning hyperparameters:')
+    print('\n  Tuning hyperparameters:\n')
     estimators_list= []
-    estimators_list.append(SGDR())
-    estimators_list.append(svm.SVR())
-    estimators_list.append(KNR())
-    estimators_list.append(DTR(random_state=42))
-    estimators_list.append(MLPR(random_state=42,max_iter=10000))
-    estimators_list.append(TR(power=0,max_iter=20000,alpha=.01))
-#    estimators_list.append(TR(power=1,max_iter=20000))
+#    estimators_list.append(SGDR())
+#    estimators_list.append(svm.SVR())
+#    estimators_list.append(KNR())
+#    estimators_list.append(DTR(random_state=42))
+#    estimators_list.append(MLPR(random_state=42,max_iter=10000))
+    estimators_list.append(TR(power=0))
+#    estimators_list.append(TR(power=1))
 #    estimators_list.append(TR(power=2,max_iter=50000))
 #    estimators_list.append(TR(power=3,max_iter=50000))
     for i in estimators_list:
+# Evaluate the models straight away (no cv) to check gross performance
+        estim_name=i.__class__.__name__
+        print('  ------------------------------------')
+        print(' ',estim_name,'- Best set found for',':')
+        print('  ------------------------------------\n')
+        print('  ~~~ Default parameters ~~~')
+        i.fit(x_train,y_train)
+        print(' ',i)
+        print('   Score:',i.score(x_test,y_test))
+# Perform cross-validation
         pars=gridsearchcv(i,x_train,y_train,x_test,y_test,x,y,feat_names)
 
 # Create instance of model SVM

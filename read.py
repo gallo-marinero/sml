@@ -18,61 +18,90 @@ import dim_red_plot, train_mod, tests, fs, predict_evaluate
 #from sklearn.metrics import pairwise_distances, davies_bouldin_score
 #from umap import UMAP
 
+# Remove features repeated >80% of the time
+var_thresh=False
+# Perform feature selection
+feat_sel=False
+# Print UMAP dimensionality reduction
+umap=False
+# Performed PCA explained variance. If == 0, skip
+pca_expl_var=0
+# Performed similarity tests
+simil_test=False
+
 # Create StandardScaler instance
 #sscaler=StandardScaler()
 sscaler=MinMaxScaler()
 
-# Insert the y (output or target column title)
-#yname='Dry_thickness'
-yname='OCV_after_24h_rest'
+#POUCH
+yname='cathode_am_mass'
+#yname='n_cycles_qretention80'
 # Title of the columns that are to be dropped (if none, leave empty dropcols=[])
 #dropcols=['Airflow2','Jar','Sample','Exp','Active_Material','Liquid_content','Carbon','Binder','Dry_thickness']
-dropcols=['Pouch_cell','Anode_thickness','DCH_capacity3_cycle_mass','DCH_capacity3_cycle_area',
-        'Coulombic_efficiency3_cycle','AverageCH_voltage3_cycle', 'AverageDCH_voltage3_cycle',
-        'Polarization_20%SOC_3cycle','Polarization_80%SOC_3cycle','DCH_capacity_last_mass',
-        'DCH_capacity_last_area','Coulombic_efficiency_last',
-        'Average_CH_voltage_last','Average_DCH_voltage_last','Polarization_20%SOC_last',
-        'Polarization_80%SOC_last','Number_cycles','Number_cyclesQE>99%','Number_cyclesQretention>80%']
+#pouchdropcols=['pouch_cell','n_cycles_qe99']
+#pouchdropcols=['pouch_cell','anode_thickness','membrane_fabrication','membrane_composition','manual_sealing','viscosity','web_speed','drying_z1','flow_z1','drying_z2','flow_z2','wet_thickness','drying_speed','alu_mass','n_cycles_qe99','rate_capability']
+dropcols=['pouch_cell']
+# AJURIA
+#yname='weightam'
+#dropcols=['Exp','dry_thickness']
 # Read the raw numbers as pd.DataFrame
-rawdat=pd.read_csv(sys.argv[1])
+print('-> Reading the data from', sys.argv[1])
+print('   Modelling', yname)
+x=pd.read_csv(sys.argv[1])
 # Loop over the columns that should be dropped
 for i in dropcols:
-    rawdat=rawdat.drop(columns=[i])
+    x=x.drop(columns=[i])
 # Pop the column that is the output and assign it to y
-rawdata=rawdat
-y=rawdat.pop(yname)
-x=rawdat
+y=x.pop(yname)
 # Store the name of the columns in a list (useful for plotting e.g.: feature_importances_)
 feat_names=list(x.columns)
-# Perform standard scaling before PCA
+n_feats=len(x.columns)
+
+# Remove features that are 0/1 in 80% of the cases
+if var_thresh:
+    x,dropped=fs.vt(x,feat_names)
+# Drop them from the original dataset. Just to be able to recover the original tags
+    for i in dropped:
+        x=x.drop(columns=[i])
+# Perform standard scaling
 x_scal=sscaler.fit_transform(x)
+# Tag back the columns after scaling
 x_scal=pd.DataFrame(x_scal,index=x.index,columns=x.columns)
+
 # Perform PCA analysis and choose the most relevant components
 # if crit (second argument) is integer -> perform PCA with crit number of components
 # if crit is float -> perform PCA until crit variance is explained
 # components
-'''
-dim_red_plot.pca_feat(x_scal,.95,True)
+if pca_expl_var != 0:
+    x=dim_red_plot.pca_feat(x_scal,pca_expl_var,True)
 # Perform UMAP dim reduction and plot it (coloured with the results)
-dim_red_plot.umap(x_scal,y)
-exit()
-'''
-'''
+if umap:
+    dim_red_plot.umap(x_scal,y)
 # Perform train and test similarity tests
-print('\n-> Performing similarty tests')
-tests.rf_diff_dist(x_scal,y,yname)
-tests.ks(x_scal,y)
-#tests.mahalanobis(x,y)
-exit()
-'''
+if simil_test:
+    print('\n-> Performing similarty tests')
+    tests.rf_diff_dist(x_scal,y,yname)
+    tests.ks(x_scal,y)
+##tests.mahalanobis(x,y)
+
 # Perform feature selection
-print('\n-> Performing feature selection')
-fs.skb(x,y)
-exit()
+if feat_sel:
+    print('\n-> Performing feature selection')
+# Perform MI and F-reg. Select according to SelectKBest
+    fs.skb(x,y,feat_names)
+# Perform recursive feature elimination with cross-validation
+    fs.rfecv(x,y,feat_names)
+
+if n_feats > x.shape[1]:
+    print('\n  Applied feature reduction PCA')
+    print('   Reduced from ',n_feats,' to ',x.shape[1],' features')
+
+print('\n -> Modellling with ',x.shape[1],' features')
 # Train models and get scores. x,y are not scaled
 train_mod.trainmod(x,y,feat_names=False)
+
 # Evaluate model
-predict_evaluate.lr(x,y)
+##predict_evaluate.pred_eval(x,y,model)
 # Build a pipeline for simplicity and safety when doing the steps to build the
 # models
 #pipe = make_pipeline(StandardScaler(),svm.SVR())

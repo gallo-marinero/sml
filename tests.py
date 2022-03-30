@@ -18,11 +18,10 @@ def rf_diff_dist(x,y,yname):
     print('\n ~ Random Forest test ~ ')
     for i in range(2):
         if i == 0:
-            print('Nonrandom train/test split: ')
+            print('    Nonrandom train/test split: ')
             x_train, x_test, y_train, y_test = train_test_split(x,y,test_size=0.33,shuffle=False)
         elif i == 1:
-            print('\nRandom train/test split: ')
-            print(' - The ability of RF to classify into groups should drop')
+            print('\n    Random train/test split (the ability of RF to classify into groups should drop)')
             x_train, x_test, y_train, y_test = train_test_split(x,y,test_size=0.33,shuffle=True)
 # We annotate the training data with the 'train' label in a new column
         x_train = x_train.assign(dataset='train')
@@ -61,8 +60,12 @@ def ks(x,y):
 #   pvalue large (not possible to discard the null hypothesis, i.e.: they are
 #   identical)
 # Split nonrandomly
-    print('\n ~ Kolmogorov-Smirnov test ~ the bigger, the more different')
+    print('\n ~ Kolmogorov-Smirnov test ~ the bigger KS, the more different the distributions')
     print('\n   Null hypothesis: distributions are identical')
+    print('      - Nonrandom:')
+    print('         The distributions might be very different (large KS)')
+    print('      - Random:')
+    print('         The distributions should not be very different (low KS, large t)')
     for i in range(2):
         if i == 0:
             sc_nrandom=[]
@@ -83,8 +86,9 @@ def ks(x,y):
     print('\n                    Nonrandom          Random train/test split')
     print('\n                   KS    t-value        KS     t-value')
     for i in range(len(sc_nrandom)):
-        print('{:15.13} {:7.5} {:7.5}     {:7.5} {:7.5}'.format(
-            x.columns[i],sc_nrandom[i],p_nrandom[i],sc_random[i],p_random[i]))
+        print('{:17.15} {:7.4} {:7.4}     {:7.4} {:7.4}'.format(
+            x.columns[i],float(sc_nrandom[i]),float(p_nrandom[i]),
+                float(sc_random[i]),float(p_random[i])))
 
 def mahalanobis(x,y):
     print('\n ~ Mahalanobis distance test ~')
