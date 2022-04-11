@@ -21,29 +21,36 @@ import dim_red_plot, train_mod, tests, fs, predict_evaluate
 # Remove features repeated >80% of the time
 var_thresh=False
 # Perform feature selection
-feat_sel=False
+feat_sel=True
 # Print UMAP dimensionality reduction
 umap=False
 # Performed PCA explained variance. If == 0, skip
 pca_expl_var=0
 # Performed similarity tests
 simil_test=False
+# Short or long scores
+short_score=True
+# Pass feature names
+feat_names=False
 
 # Create StandardScaler instance
 #sscaler=StandardScaler()
 sscaler=MinMaxScaler()
 
 #POUCH
-yname='cathode_am_mass'
+#yname='cathode_am_mass'
 #yname='n_cycles_qretention80'
 # Title of the columns that are to be dropped (if none, leave empty dropcols=[])
 #dropcols=['Airflow2','Jar','Sample','Exp','Active_Material','Liquid_content','Carbon','Binder','Dry_thickness']
 #pouchdropcols=['pouch_cell','n_cycles_qe99']
 #pouchdropcols=['pouch_cell','anode_thickness','membrane_fabrication','membrane_composition','manual_sealing','viscosity','web_speed','drying_z1','flow_z1','drying_z2','flow_z2','wet_thickness','drying_speed','alu_mass','n_cycles_qe99','rate_capability']
-dropcols=['pouch_cell']
+#dropcols=['pouch_cell']
 # AJURIA
 #yname='weightam'
 #dropcols=['Exp','dry_thickness']
+# am_loading
+yname='am_loading'
+dropcols=['name','solid_content']#,'visual_inspection']
 # Read the raw numbers as pd.DataFrame
 print('-> Reading the data from', sys.argv[1])
 print('   Modelling', yname)
@@ -78,7 +85,7 @@ if pca_expl_var != 0:
 if umap:
     dim_red_plot.umap(x_scal,y)
 # Perform train and test similarity tests
-if simil_test:
+if simil_test: 
     print('\n-> Performing similarty tests')
     tests.rf_diff_dist(x_scal,y,yname)
     tests.ks(x_scal,y)
@@ -88,9 +95,9 @@ if simil_test:
 if feat_sel:
     print('\n-> Performing feature selection')
 # Perform MI and F-reg. Select according to SelectKBest
-    fs.skb(x,y,feat_names)
+    fs.skb(x,y,feat_names,short_score)
 # Perform recursive feature elimination with cross-validation
-    fs.rfecv(x,y,feat_names)
+    fs.rfecv(x,y,feat_names,short_score)
 
 if n_feats > x.shape[1]:
     print('\n  Applied feature reduction PCA')
@@ -98,7 +105,7 @@ if n_feats > x.shape[1]:
 
 print('\n -> Modellling with ',x.shape[1],' features')
 # Train models and get scores. x,y are not scaled
-train_mod.trainmod(x,y,feat_names=False)
+train_mod.trainmod(x,y,feat_names,short_score)
 
 # Evaluate model
 ##predict_evaluate.pred_eval(x,y,model)

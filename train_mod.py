@@ -8,6 +8,8 @@ from sklearn.tree import DecisionTreeRegressor as DTR
 from sklearn.neighbors import KNeighborsRegressor as KNR
 from sklearn.linear_model import SGDRegressor as SGDR
 from sklearn.linear_model import TweedieRegressor as TR
+from sklearn.gaussian_process import GaussianProcessRegressor as GPR
+from sklearn.gaussian_process.kernels import RBF,DotProduct,ConstantKernel,Matern,RationalQuadratic,ExpSineSquared
 from sklearn.metrics import mean_tweedie_deviance, make_scorer
 from sklearn import svm
 from sklearn import metrics
@@ -191,7 +193,7 @@ def covar_print(results_df,score,estim_name):
 # print correlation of AUC scores across folds
     print(f"Correlation of models:\n {model_scores.transpose().corr()}")
 
-def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names):
+def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,short_score):
     print('\n  Set with',x.shape[0],'samples and ',x.shape[1],'features')
     print('  Training set size: ',x_train.shape[0])
     print('  Test set size: ',x_test.shape[0],'\n')
@@ -200,7 +202,11 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names):
 # Set the parameters by cross-validation
     nonneg=['explained_variance','max_error','r2']
     neg=['neg_mean_absolute_error','neg_mean_squared_error','neg_root_mean_squared_error','neg_mean_squared_log_error','neg_median_absolute_error','neg_mean_gamma_deviance','neg_mean_absolute_percentage_error']
+# Evaluate all scores
     scores=nonneg+neg
+# If short_score=True, evaluate only nonneg scores
+    if short_score:
+        scores=nonneg
     estim_name=estimator.__class__.__name__
 #    if estim_name=='LogisticRegression':
 #        tuned_parameters = [{'penalty': ['none'], 'C': [.05,0.3,.5,.7,.9,1,5,10]},
@@ -212,6 +218,12 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names):
                     {'kernel': ['linear'], 'gamma': ['scale', 'auto'], 'C': [.1,1, 10, 100]},
                     {'kernel': ['poly'], 'gamma': ['scale', 'auto'], 'C': [.1,1, 10, 100]},
                     {'kernel': ['sigmoid'], 'gamma': ['scale', 'auto'], 'C': [.1,1, 10, 100]}]
+    elif estim_name=='GaussianProcessRegressor':
+        rbf=RBF()
+        ck=ConstantKernel()
+        mat=Matern()
+        default=None
+        tuned_parameters = [{'kernel':[rbf],}]#'RationalQuadratic','ExpSineSquared','DotProduct']}]
     elif estim_name=='SGDRegressor':
         tuned_parameters = [{'loss': ['squared_loss'], 'alpha': [1e-5, 1e-4,
             1e-3, 1e-2,.1,1],
@@ -297,7 +309,7 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names):
     print()
     return clf.best_params_
 
-def trainmod(x,y,feat_names):
+def trainmod(x,y,feat_names,short_score):
 # Create StandardScaler instance
     sscaler=StandardScaler()
 # Scale x
@@ -322,6 +334,7 @@ def trainmod(x,y,feat_names):
     print('\n  Tuning hyperparameters:\n')
     estimators_list= []
 #    estimators_list.append(SGDR())
+#    estimators_list.append(GPR(n_restarts_optimizer=10))
 #    estimators_list.append(svm.SVR())
 #    estimators_list.append(KNR())
 #    estimators_list.append(DTR(random_state=42))
@@ -341,7 +354,7 @@ def trainmod(x,y,feat_names):
         print(' ',i)
         print('   Score:',i.score(x_test,y_test))
 # Perform cross-validation
-        pars=gridsearchcv(i,x_train,y_train,x_test,y_test,x,y,feat_names)
+        pars=gridsearchcv(i,x_train,y_train,x_test,y_test,x,y,feat_names,short_score)
 
 # Create instance of model SVM
 #    svr=svm.SVR()
