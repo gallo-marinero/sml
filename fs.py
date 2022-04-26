@@ -9,7 +9,7 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.tree import DecisionTreeRegressor as DTR
 from sklearn.linear_model import TweedieRegressor as TR
 from numpy import mean, std
-import predict_evaluate, train_mod
+import predict_evaluate, train
 import numpy as np
 
 def vt(x,feat_names):
@@ -61,7 +61,7 @@ def skb_bestk(x,y,k,model,score_f,feat_names,short_score):
     for i in range(len(skb.scores_)-1,len(skb.scores_)-k-1,-1):
         print('   {0:2} {1:13s} {2:7.3f}'.format(scores[i],feat_names[scores[i]],skb.scores_[scores[i]]))
     print('\n   Training with',k,'features:')
-    train_mod.trainmod(x_skb,y,feat_names,short_score)
+    train.trainmod(x_skb,y,feat_names,short_score)
             
 
 def skb(x,y,feat_names,short_score):
@@ -132,7 +132,7 @@ def rfecv(x,y,feat_names,short_score):
             print('   {0:2} {1:13s} {2:7.3f}'.format(i,feat_names[i],rfecv.cv_results_['mean_test_score'][i]))
 
     print('\n   Training with',rfecv.n_features_,'features:')
-    train_mod.trainmod(x_rfecv,y,feat_names,short_score)
+    train.trainmod(x_rfecv,y,feat_names,short_score)
 #    pipeline = Pipeline(steps=[('s',rfe),('m',model)])
 #    n_scores = cross_val_score(pipeline, x, y, scoring='neg_mean_absolute_error', cv=cv, n_jobs=-1, error_score='raise')
 #    print('  %i   %.3f   (%.3f)' % (rfe.n_features_, mean(n_scores), std(n_scores)))

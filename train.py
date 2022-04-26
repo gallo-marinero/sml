@@ -3,15 +3,9 @@ from scipy.stats import t
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split, KFold, GridSearchCV, validation_curve, learning_curve,ShuffleSplit
-from sklearn.neural_network import MLPRegressor as MLPR
-from sklearn.tree import DecisionTreeRegressor as DTR
-from sklearn.neighbors import KNeighborsRegressor as KNR
-from sklearn.linear_model import SGDRegressor as SGDR
-from sklearn.linear_model import TweedieRegressor as TR
-from sklearn.gaussian_process import GaussianProcessRegressor as GPR
+from sklearn import svm
 from sklearn.gaussian_process.kernels import RBF,DotProduct,ConstantKernel,Matern,RationalQuadratic,ExpSineSquared
 from sklearn.metrics import mean_tweedie_deviance, make_scorer
-from sklearn import svm
 from sklearn import metrics
 from sklearn.decomposition import PCA
 import pandas as pd
@@ -193,40 +187,46 @@ def covar_print(results_df,score,estim_name):
 # print correlation of AUC scores across folds
     print(f"Correlation of models:\n {model_scores.transpose().corr()}")
 
-def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,short_score):
+def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,short_score,classification):
     print('\n  Set with',x.shape[0],'samples and ',x.shape[1],'features')
     print('  Training set size: ',x_train.shape[0])
     print('  Test set size: ',x_test.shape[0],'\n')
     print('  ~~~ Tuning of the parameters ~~~')
     print('   Validation curves calculated for each scoring function')
 # Set the parameters by cross-validation
-    nonneg=['explained_variance','max_error','r2']
-    neg=['neg_mean_absolute_error','neg_mean_squared_error','neg_root_mean_squared_error','neg_mean_squared_log_error','neg_median_absolute_error','neg_mean_gamma_deviance','neg_mean_absolute_percentage_error']
-# Evaluate all scores
-    scores=nonneg+neg
+    if classification:
+        scores=['mutual_info_score','homogeneity_score','fowlkes_mallows_score',\
+        'completeness_score','adjusted_rand_score','adjusted_mutual_info_score',\
+        'rand_score','v_measure_score','normalized_mutual_info_score']
+    else:
 # If short_score=True, evaluate only nonneg scores
-    if short_score:
-        scores=nonneg
+        scores=['explained_variance','max_error','r2']
+        if not short_score:
+            neg=['neg_mean_absolute_error','neg_mean_squared_error',\
+        'neg_root_mean_squared_error','neg_mean_squared_log_error',\
+        'neg_median_absolute_error','neg_mean_gamma_deviance','neg_mean_absolute_percentage_error']
+# Evaluate all scores
+            scores=scores+neg
     estim_name=estimator.__class__.__name__
-#    if estim_name=='LogisticRegression':
-#        tuned_parameters = [{'penalty': ['none'], 'C': [.05,0.3,.5,.7,.9,1,5,10]},
-#        {'penalty': ['l2'], 'C': [.05,0.3,.5,.7,.9,1,5,10]},
-#        {'penalty': ['l1'], 'C': [.05,0.3,.5,.7,.9,1,5,10]},
-#        {'penalty': ['elasticnet'], 'C': [.05,0.3,.5,.7,.9,1,5,10]}]
-    if estim_name=='SVR':
-        tuned_parameters = [{'kernel': ['rbf'], 'gamma': ['scale', 'auto'], 'C': [1, 10, 100, 1000]},
-                    {'kernel': ['linear'], 'gamma': ['scale', 'auto'], 'C': [.1,1, 10, 100]},
-                    {'kernel': ['poly'], 'gamma': ['scale', 'auto'], 'C': [.1,1, 10, 100]},
-                    {'kernel': ['sigmoid'], 'gamma': ['scale', 'auto'], 'C': [.1,1, 10, 100]}]
+    if estim_name=='SVR' or estim_name=='SVC':
+        tuned_parameters = [{'kernel': ['rbf'],'gamma': ['scale', 'auto'], 'C': [1, 10, 100, 1000]},
+                            {'kernel': ['linear'],'gamma': ['scale', 'auto'], 'C': [.1,1, 10, 100]},
+                            {'kernel': ['poly'],'gamma': ['scale', 'auto'], 'C': [.1,1, 10, 100],
+                             'degree': [1,2,3,4,5]},
+                            {'kernel': ['sigmoid'], 'gamma': ['scale', 'auto'], 'C': [.1,1, 10, 100]}]
     elif estim_name=='GaussianProcessRegressor':
         rbf=RBF()
         ck=ConstantKernel()
         mat=Matern()
         default=None
         tuned_parameters = [{'kernel':[rbf],}]#'RationalQuadratic','ExpSineSquared','DotProduct']}]
+    elif estim_name=='LogisticRegression':
+        tuned_parameters = [{'penalty':['none'],'solver':['newton-cg','lbfgs','sag','saga']},
+        {'penalty':['l2'],'solver':['newton-cg','lbfgs','sag','saga'],'C': [.1,.3,.5,1,10,15]},
+        {'penalty':['l1'],'solver':['saga'],'C': [.1,.3,.5,1,10,15]},
+        {'penalty':['elasticnet'],'solver':['saga'],'C': [.1,.3,.5,1,10,15],'l1_ratio':[.1,.3,.5,.7,.9]}]
     elif estim_name=='SGDRegressor':
-        tuned_parameters = [{'loss': ['squared_loss'], 'alpha': [1e-5, 1e-4,
-            1e-3, 1e-2,.1,1],
+        tuned_parameters = [{'loss': ['squared_error'], 'alpha': [1e-5, 1e-4, 1e-3, 1e-2,.1,1],
                         'learning_rate': ['constant','optimal','invscaling','adaptive']},
                     {'loss': ['huber'], 'alpha': [1e-5, 1e-4, 1e-3, 1e-2,.1,1], 
                         'learning_rate': ['constant','optimal','invscaling','adaptive']},
@@ -236,17 +236,26 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,short_sc
                     {'loss': ['squared_epsilon_insensitive'], 'alpha': [1e-5,
                         1e-4, 1e-3, 1e-2,.1,1],
                         'learning_rate': ['constant','optimal','invscaling','adaptive']}]
+    elif estim_name=='SGDClassifier':
+        tuned_parameters = [{'loss': ['hinge'], 'alpha': [1e-5, 1e-4, 1e-3, 1e-2,.1,1],
+                        'learning_rate': ['constant','optimal','invscaling','adaptive']},
+                    {'loss': ['modified_huber'], 'alpha': [1e-5, 1e-4, 1e-3, 1e-2,.1,1], 
+                        'learning_rate': ['constant','optimal','invscaling','adaptive']},
+                    {'loss': ['squared_hinge'], 'alpha': [1e-5, 1e-4,
+                        1e-3, 1e-2,.1,1],
+                        'learning_rate': ['constant','optimal','invscaling','adaptive']},
+                    {'loss': ['perceptron'], 'alpha': [1e-5,
+                        1e-4, 1e-3, 1e-2,.1,1],
+                        'learning_rate': ['constant','optimal','invscaling','adaptive']}]
     elif estim_name=='TweedieRegressor':
         tuned_parameters = [{'alpha': [.001,.005,.01,.05,0.3,.5,.7,.9,1,5,10]}]
 #        {'power': [1], 'link':['log'],'alpha': [0.3,.5,.7,.9,1,5,10]},
 #        {'power': [2], 'alpha': [0.3,.5,.7,.9,1,5,10]},
 #        {'power': [3], 'alpha': [0.3,.5,.7,.9,1,5,10]}]
-    elif estim_name=='KNeighborsRegressor':
-         tuned_parameters = [{'algorithm': ['auto'], 'p': [1,2,7], 'n_neighbors': [2,5,7,11]}]
-#        {'algorithm': ['ball_tree'],'p': [1,2,7], 'n_neighbors': [2,5,7,11]},
-#        {'algorithm': ['kd_tree'], 'p': [1,2,7], 'n_neighbors': [2,5,7,11]},
-#        {'algorithm': ['auto'], 'p': [1,2,7], 'n_neighbors': [2,5,7,11]}]
-    elif estim_name=='DecisionTreeRegressor':
+    elif estim_name=='KNeighborsRegressor' or estim_name=='KNeighborsClassifier':
+         tuned_parameters = [{'p': [1,2,7], 'n_neighbors': [2,3,4]}]
+#         tuned_parameters = [{'p': [1,2,7], 'n_neighbors': [2,5,7,11]}]
+    elif estim_name=='DecisionTreeRegressor' or estim_name=='DecisionTreeClassifier':
 # Evaluate, in case of Decision Tree, the feature importances
         if feat_names != False:
             dtr = estimator.fit(x_train,y_train)
@@ -263,10 +272,14 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,short_sc
             plt.xticks(lab_site,lab,rotation=0)
             plt.savefig('dtr_feat_importances.png')
             plt.close()
-        tuned_parameters = [{'splitter': ['best'],
+        if estim_name=='DecisionTreeRegressor':
+            tuned_parameters = [{'splitter': ['best'],
             'criterion': ['squared_error','friedman_mse','absolute_error','poisson']},
         {'splitter': ['random'],
             'criterion': ['squared_error','friedman_mse','absolute_error','poisson']}]
+        elif estim_name=='DecisionTreeClassifier':
+            tuned_parameters = [{'splitter': ['best'], 'criterion': ['gini','entropy']},
+            {'splitter': ['random'], 'criterion': ['gini','entropy']}]
     elif estim_name=='MLPRegressor':
         tuned_parameters = [
         {'solver':['lbfgs'],
@@ -285,9 +298,10 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,short_sc
         results_df = (results_df.set_index(results_df["params"].apply(
             lambda v: "_".join(str(val) for val in v.values()))))
 # Print results
-        if score in neg:
-            print('\n ·',score,':',-round(clf.score(x_test,y_test),4))
-        elif score in nonneg:
+        if not classification:
+            if score in neg:
+                print('\n ·',score,':',-round(clf.score(x_test,y_test),4))
+        else:
             print('\n ·',score,':',round(clf.score(x_test,y_test),4))
         print(results_df[['mean_test_score','std_test_score']].head(1))
 #        print(clf.predict(x_test), y_test)
@@ -309,7 +323,39 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,short_sc
     print()
     return clf.best_params_
 
-def trainmod(x,y,feat_names,short_score):
+def trainmod(x,y,feat_names,short_score,classification,estimator):
+    estimators_list= []
+    for i in estimator:
+        if classification:
+            if i == 'knn':
+                from sklearn.neighbors import KNeighborsClassifier as KNC
+                estimators_list.append(KNC(n_neighbors=4))
+            elif i == 'svm':
+                estimators_list.append(svm.SVC())
+            elif i == 'sgd':
+                from sklearn.linear_model import SGDClassifier as SGDC
+                estimators_list.append(SGDC(max_iter=10000))
+            elif i == 'dt':
+                from sklearn.tree import DecisionTreeClassifier as DTC
+                estimators_list.append(DTC())
+            elif i == 'lr':
+                from sklearn.linear_model import LogisticRegression as LR
+                estimators_list.append(LR(max_iter=20000))
+        else:
+            if i == 'knn':
+                from sklearn.neighbors import KNeighborsRegressor as KNR
+                estimators_list.append(KNR())
+            elif i == 'svm':
+                estimators_list.append(svm.SVR())
+            elif i == 'sgd':
+                from sklearn.linear_model import SGDRegressor as SGDR
+                estimators_list.append(SGDR())
+            elif i == 'dt':
+                from sklearn.tree import DecisionTreeRegressor as DTR
+                estimators_list.append(DTR())
+#        from sklearn.neural_network import MLPRegressor as MLPR
+#        from sklearn.linear_model import TweedieRegressor as TR
+#        from sklearn.gaussian_process import GaussianProcessRegressor as GPR
 # Create StandardScaler instance
     sscaler=StandardScaler()
 # Scale x
@@ -332,14 +378,10 @@ def trainmod(x,y,feat_names,short_score):
 #    print('  Reduced from ',x.shape[1],' to ',x_train.shape[1],' features')
 
     print('\n  Tuning hyperparameters:\n')
-    estimators_list= []
-#    estimators_list.append(SGDR())
 #    estimators_list.append(GPR(n_restarts_optimizer=10))
-#    estimators_list.append(svm.SVR())
-#    estimators_list.append(KNR())
 #    estimators_list.append(DTR(random_state=42))
 #    estimators_list.append(MLPR(random_state=42,max_iter=10000))
-    estimators_list.append(TR(power=0))
+#    estimators_list.append(TR(power=0))
 #    estimators_list.append(TR(power=1))
 #    estimators_list.append(TR(power=2,max_iter=50000))
 #    estimators_list.append(TR(power=3,max_iter=50000))
@@ -352,9 +394,10 @@ def trainmod(x,y,feat_names,short_score):
         print('  ~~~ Default parameters ~~~')
         i.fit(x_train,y_train)
         print(' ',i)
+        print('   Parameters:',i.get_params())
         print('   Score:',i.score(x_test,y_test))
 # Perform cross-validation
-        pars=gridsearchcv(i,x_train,y_train,x_test,y_test,x,y,feat_names,short_score)
+        pars=gridsearchcv(i,x_train,y_train,x_test,y_test,x,y,feat_names,short_score,classification)
 
 # Create instance of model SVM
 #    svr=svm.SVR()

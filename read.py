@@ -9,19 +9,27 @@ from sklearn.decomposition import PCA
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler,MinMaxScaler
 from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LinearRegression as LR
-from sklearn.linear_model import SGDRegressor as SGDR
-from sklearn import svm 
 from sklearn.model_selection import cross_val_score
-from sklearn.feature_selection import SelectKBest as skb
-import dim_red_plot, train_mod, tests, fs, predict_evaluate
-#from sklearn.metrics import pairwise_distances, davies_bouldin_score
+import dim_red_plot, train, tests, fs, predict_evaluate
 #from umap import UMAP
 
+# Regression problem by default
+classification=True
+# Choose the estimator
+# K-Nearest Neighbors: knn
+# Support Vector Machine: svm
+# Stochastic Gradient Descent: sgd
+# Decission Tree: dt
+# Logistic Regression (classification only): lr
+estimator=['lr']
 # Remove features repeated >80% of the time
 var_thresh=False
 # Perform feature selection
-feat_sel=True
+feat_sel=False
+# Remove features repeated >80% of the time
+var_thresh=False
+# Perform feature selection
+feat_sel=False
 # Print UMAP dimensionality reduction
 umap=False
 # Performed PCA explained variance. If == 0, skip
@@ -48,12 +56,19 @@ sscaler=MinMaxScaler()
 # AJURIA
 #yname='weightam'
 #dropcols=['Exp','dry_thickness']
-# am_loading
-yname='am_loading'
-dropcols=['name','solid_content']#,'visual_inspection']
+# AM_LOADING
+#yname='am_loading'
+yname='visual_inspection'
+dropcols=['name']#,'visual_inspection']
+
+# Print classification/regression
+if classification:
+    print('\n     Classification fit')
+else:
+    print('\n     Regression fit')
 # Read the raw numbers as pd.DataFrame
-print('-> Reading the data from', sys.argv[1])
-print('   Modelling', yname)
+print('\n -> Reading the data from', sys.argv[1])
+print('   Modelling \'', yname, '\' variable')
 x=pd.read_csv(sys.argv[1])
 # Loop over the columns that should be dropped
 for i in dropcols:
@@ -95,9 +110,9 @@ if simil_test:
 if feat_sel:
     print('\n-> Performing feature selection')
 # Perform MI and F-reg. Select according to SelectKBest
-    fs.skb(x,y,feat_names,short_score)
+    fs.skb(x_scal,y,feat_names,short_score)
 # Perform recursive feature elimination with cross-validation
-    fs.rfecv(x,y,feat_names,short_score)
+    fs.rfecv(x_scal,y,feat_names,short_score)
 
 if n_feats > x.shape[1]:
     print('\n  Applied feature reduction PCA')
@@ -105,7 +120,7 @@ if n_feats > x.shape[1]:
 
 print('\n -> Modellling with ',x.shape[1],' features')
 # Train models and get scores. x,y are not scaled
-train_mod.trainmod(x,y,feat_names,short_score)
+train.trainmod(x,y,feat_names,short_score,classification,estimator)
 
 # Evaluate model
 ##predict_evaluate.pred_eval(x,y,model)
