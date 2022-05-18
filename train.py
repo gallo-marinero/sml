@@ -5,21 +5,22 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split, KFold, GridSearchCV, validation_curve, learning_curve,ShuffleSplit
 from sklearn import svm
 from sklearn.gaussian_process.kernels import RBF,DotProduct,ConstantKernel,Matern,RationalQuadratic,ExpSineSquared
-from sklearn.metrics import mean_tweedie_deviance, make_scorer
+from sklearn.metrics import mean_tweedie_deviance, make_scorer,confusion_matrix,ConfusionMatrixDisplay
 from sklearn import metrics
 from sklearn.decomposition import PCA
 import pandas as pd
 
 
-def l_curve(estim,score,estim_name,params,x,y):
+def l_curve(estim,score,estim_name,params,x,y,best_score):
 #    cv = ShuffleSplit(n_splits=100, test_size=0.2, random_state=0)
     cv = KFold(n_splits=10, shuffle=True, random_state=0)
     _, axes = plt.subplots(1, 3, figsize=(20, 5))
+# Add best_params_ and best_score_ to the figure
+    params['SCORE']=round(best_score,3)
+    _.suptitle(params)
     axes[0].set_title('Learning curve '+estim_name)
-#    if ylim is not None:
-#        axes[0].set_ylim(*ylim)
     axes[0].set_xlabel("Training examples")
-    axes[0].set_ylabel("Score")
+    axes[0].set_ylabel(str(score))
 
     train_sizes,train_scores,test_scores,fit_times,score_times=learning_curve(
     estim,x,y,train_sizes=np.linspace(.1,1.0,7),cv=cv,return_times=True,shuffle=False)
@@ -54,12 +55,12 @@ def l_curve(estim,score,estim_name,params,x,y):
     axes[2].fill_between(fit_times_mean, test_scores_mean - test_scores_std,
                          test_scores_mean + test_scores_std, alpha=0.1)
     axes[2].set_xlabel("fit_times")
-    axes[2].set_ylabel("Score")
+    axes[2].set_ylabel(str(score))
     axes[2].set_title("Performance of the model")
     if estim_name == 'TweedieRegressor':
         plt.savefig(estim_name+'_power'+str(estim.get_params()['power'])+'_lc.png')
     else:
-        plt.savefig(estim_name+'_lc.png')
+        plt.savefig(estim_name+'_'+str(score)+'_lc.png')
     plt.clf()
 #    plt.show()
 
@@ -187,7 +188,8 @@ def covar_print(results_df,score,estim_name):
 # print correlation of AUC scores across folds
     print(f"Correlation of models:\n {model_scores.transpose().corr()}")
 
-def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,short_score,classification):
+def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
+        short_score,classification,class_dim):
     print('\n  Set with',x.shape[0],'samples and ',x.shape[1],'features')
     print('  Training set size: ',x_train.shape[0])
     print('  Test set size: ',x_test.shape[0],'\n')
@@ -195,12 +197,12 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,short_sc
     print('   Validation curves calculated for each scoring function')
 # Set the parameters by cross-validation
     if classification:
-        scores=['mutual_info_score','homogeneity_score','fowlkes_mallows_score',\
-        'completeness_score','adjusted_rand_score','adjusted_mutual_info_score',\
-        'rand_score','v_measure_score','normalized_mutual_info_score']
+        scores=[None,'accuracy','balanced_accuracy','precision','recall','roc_auc','precision']
+#        scores=[None,'accuracy','balanced_accuracy','roc_auc_ovr','neg_log_loss','roc_auc_ovo',\
+#        'roc_auc_ovr_weighted','roc_auc_ovo_weighted']
     else:
 # If short_score=True, evaluate only nonneg scores
-        scores=['explained_variance','max_error','r2']
+        scores=[None,'explained_variance','max_error','r2']
         if not short_score:
             neg=['neg_mean_absolute_error','neg_mean_squared_error',\
         'neg_root_mean_squared_error','neg_mean_squared_log_error',\
@@ -253,8 +255,8 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,short_sc
 #        {'power': [2], 'alpha': [0.3,.5,.7,.9,1,5,10]},
 #        {'power': [3], 'alpha': [0.3,.5,.7,.9,1,5,10]}]
     elif estim_name=='KNeighborsRegressor' or estim_name=='KNeighborsClassifier':
-         tuned_parameters = [{'p': [1,2,7], 'n_neighbors': [2,3,4]}]
-#         tuned_parameters = [{'p': [1,2,7], 'n_neighbors': [2,5,7,11]}]
+        tuned_parameters = [{'weights':['uniform'],'p':[1,2,7],'n_neighbors':[2,3,4,5,6,7,8,9,10]},
+        {'weights':['distance'],'p':[1,2,7],'n_neighbors':[2,3,4,5,6,7,8,9,10]}]
     elif estim_name=='DecisionTreeRegressor' or estim_name=='DecisionTreeClassifier':
 # Evaluate, in case of Decision Tree, the feature importances
         if feat_names != False:
@@ -278,8 +280,12 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,short_sc
         {'splitter': ['random'],
             'criterion': ['squared_error','friedman_mse','absolute_error','poisson']}]
         elif estim_name=='DecisionTreeClassifier':
-            tuned_parameters = [{'splitter': ['best'], 'criterion': ['gini','entropy']},
-            {'splitter': ['random'], 'criterion': ['gini','entropy']}]
+            tuned_parameters = [{'splitter':['best'],'criterion':['gini','entropy'],\
+            'class_weight':['balanced',None],'ccp_alpha':[0.0,.5,1.0],\
+            'max_features':['auto','sqrt','log2',None]},
+            {'splitter': ['random'], 'criterion': ['gini','entropy'],\
+            'class_weight':['balanced',None],'ccp_alpha':[0.0,.5,1.0],\
+            'max_features':['auto','sqrt','log2',None]}]
     elif estim_name=='MLPRegressor':
         tuned_parameters = [
         {'solver':['lbfgs'],
@@ -304,29 +310,58 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,short_sc
         else:
             print('\n ·',score,':',round(clf.score(x_test,y_test),4))
         print(results_df[['mean_test_score','std_test_score']].head(1))
-#        print(clf.predict(x_test), y_test)
+        print(clf.best_estimator_)
 # Validation curve
         if estim_name=='TweedieRegressor':
-            val_curve(estimator,score,estim_name,tuned_parameters,x,y)
+            val_curve(clf.best_estimator_,score,estim_name,best_params_,x,y)
 # Learning curve
-        l_curve(estimator,score,estim_name,tuned_parameters,x,y)
+        l_curve(clf.best_estimator_,score,estim_name,clf.best_params_,x,y,clf.best_score_)
 
 # Function to print the score with respect to the fold: informs whether the
 # results are dependent on the fold
 ##        covar_print(results_df,score,estim_name)
-        bayesian_test(results_df,x,y)
+##        bayesian_test(results_df,x,y)
 
 # Uncomment to print all grid results
 #    for mean, std, params in zip(means, stds, clf.cv_results_['params']):
 #        print("%0.3f (+/-%0.03f) for %r"
 #              % (mean, std * 2, params))
-    print()
+    if class_dim == 2:
+        print('\n  ~~~ Binary classification problem ~~~')
+        y_predict=clf.predict(x_test)
+        print(clf.best_estimator_)
+        y_test=y_test.to_numpy()
+        print('Accuracy', metrics.accuracy_score(y_test, y_predict))
+        print('Precision', metrics.precision_score(y_test, y_predict))
+        print('Recall', metrics.recall_score(y_test, y_predict))
+        print('ROC_AUC', metrics.roc_auc_score(y_test, y_predict))
+        cm=confusion_matrix(y_test, y_predict)
+        tn,fp,fn,tp=cm.ravel()
+        print('  Confusion matrix plotted to',estim_name+'_cm.png')
+        print('    True negatives',tn)
+        print('    False positives',fp)
+        print('    False negatives',fn)
+        print('    True positives',tp)
+# If binary classification problem, plot confusion matrix
+        disp = ConfusionMatrixDisplay(confusion_matrix=cm,display_labels=clf.classes_)
+        disp.plot()
+        plt.savefig(estim_name+'_cm.png')
+        print()
     return clf.best_params_
 
 def trainmod(x,y,feat_names,short_score,classification,estimator):
     estimators_list= []
+    class_dim=0
     for i in estimator:
         if classification:
+# If it is a classification problem, find out number of classes and counts
+            unique, counts=np.unique(y,return_counts=True)
+            print('  ',len(unique),'clases')
+            print('  Class  Counts')
+# Store number of classes in class_dim
+            class_dim= len(unique)
+            for j in range(class_dim):
+                print('   ',unique[j],'  ',counts[j])
             if i == 'knn':
                 from sklearn.neighbors import KNeighborsClassifier as KNC
                 estimators_list.append(KNC(n_neighbors=4))
@@ -361,7 +396,7 @@ def trainmod(x,y,feat_names,short_score,classification,estimator):
 # Scale x
     x=sscaler.fit_transform(x)
 # Create train and test sets from the original dataset
-    x_train, x_test, y_train, y_test = train_test_split(x, y, random_state=42)
+    x_train, x_test, y_train, y_test = train_test_split(x, y,test_size=.2, random_state=42)
 # Perform standard scaling; fit only on the training set
 ##    x_train=sscaler.fit_transform(x_train)
 # Scale x
@@ -397,7 +432,7 @@ def trainmod(x,y,feat_names,short_score,classification,estimator):
         print('   Parameters:',i.get_params())
         print('   Score:',i.score(x_test,y_test))
 # Perform cross-validation
-        pars=gridsearchcv(i,x_train,y_train,x_test,y_test,x,y,feat_names,short_score,classification)
+        pars=gridsearchcv(i,x_train,y_train,x_test,y_test,x,y,feat_names,short_score,classification,class_dim)
 
 # Create instance of model SVM
 #    svr=svm.SVR()

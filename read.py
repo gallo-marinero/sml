@@ -1,6 +1,5 @@
 import sys, os, matplotlib, time, os.path
 import numpy as np
-#import joblib
 import pandas as pd
 #import statistics as st
 #from matplotlib import use
@@ -10,7 +9,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler,MinMaxScaler
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import cross_val_score
-import dim_red_plot, train, tests, fs, predict_evaluate
+import plot, train, tests, fs, predict_evaluate
 #from umap import UMAP
 
 # Regression problem by default
@@ -26,10 +25,11 @@ estimator=['lr']
 var_thresh=False
 # Perform feature selection
 feat_sel=False
-# Remove features repeated >80% of the time
-var_thresh=False
-# Perform feature selection
-feat_sel=False
+# Plot data in histograms
+plot_dat_hist=True
+bins=10
+plot_dat_scatter=True
+ref='viscosity'
 # Print UMAP dimensionality reduction
 umap=False
 # Performed PCA explained variance. If == 0, skip
@@ -79,6 +79,15 @@ y=x.pop(yname)
 feat_names=list(x.columns)
 n_feats=len(x.columns)
 
+# Plot data in histogram form
+if plot_dat_hist:
+    plot.plot_hist(x,bins,feat_names)
+    if not plot_dat_scatter:
+        exit()
+if plot_dat_scatter:
+    plot.plot_scatter(x,ref,feat_names)
+    exit()
+
 # Remove features that are 0/1 in 80% of the cases
 if var_thresh:
     x,dropped=fs.vt(x,feat_names)
@@ -95,10 +104,10 @@ x_scal=pd.DataFrame(x_scal,index=x.index,columns=x.columns)
 # if crit is float -> perform PCA until crit variance is explained
 # components
 if pca_expl_var != 0:
-    x=dim_red_plot.pca_feat(x_scal,pca_expl_var,True)
+    x=plot.pca_feat(x_scal,pca_expl_var,True)
 # Perform UMAP dim reduction and plot it (coloured with the results)
 if umap:
-    dim_red_plot.umap(x_scal,y)
+    plot.umap(x_scal,y)
 # Perform train and test similarity tests
 if simil_test: 
     print('\n-> Performing similarty tests')
@@ -110,9 +119,9 @@ if simil_test:
 if feat_sel:
     print('\n-> Performing feature selection')
 # Perform MI and F-reg. Select according to SelectKBest
-    fs.skb(x_scal,y,feat_names,short_score)
+    fs.skb(x_scal,y,feat_names,short_score,classification,estimator)
 # Perform recursive feature elimination with cross-validation
-    fs.rfecv(x_scal,y,feat_names,short_score)
+    fs.rfecv(x_scal,y,feat_names,short_score,classification,estimator)
 
 if n_feats > x.shape[1]:
     print('\n  Applied feature reduction PCA')

@@ -1,3 +1,5 @@
+import pandas as pd
+from os.path import exists
 import numpy as np
 from sklearn.decomposition import PCA
 from umap import UMAP
@@ -49,3 +51,24 @@ def umap(x,y):
     plt.savefig('umap.png')
     plt.show()
 
+def plot_hist(x,bins,feat_names):
+    for i in range(x.shape[1]):
+        plt.hist(x[feat_names[i]],bins=bins)
+        plt.xlabel(feat_names[i])
+        plt.savefig('hist_'+feat_names[i]+'.png')
+        plt.close() 
+
+def plot_scatter(x,ref,feat_names):
+    y=x.pop(ref)
+    feat_names.remove(ref)
+    if exists('sample_collection.csv'):
+        new_x=pd.read_csv('sample_collection.csv')
+        new_y=new_x.pop(ref)
+    for i in range(x.shape[1]):
+        plt.scatter(y,x[feat_names[i]],alpha=.7)
+        plt.xlabel(ref)
+        plt.ylabel(feat_names[i])
+        if exists('sample_collection.csv'):
+            plt.scatter(new_y,new_x[feat_names[i]],alpha=.7)
+        plt.savefig('scatter_'+feat_names[i]+'_vs_'+ref+'.png')
+        plt.close() 
