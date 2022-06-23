@@ -14,26 +14,30 @@ import plot, train, tests, fs, predict_evaluate
 
 # Regression problem by default
 classification=True
+al=False
 # Choose the estimator
+# Linear regression (Tweedie Regressor): linr
 # K-Nearest Neighbors: knn
 # Support Vector Machine: svm
 # Stochastic Gradient Descent: sgd
 # Decission Tree: dt
 # Logistic Regression (classification only): lr
-estimator=['lr']
+# Gaussian process: gp
+# Neural network: nn
+estimator=['knn']
 # Remove features repeated >80% of the time
 var_thresh=False
 # Perform feature selection
 feat_sel=False
 # Plot data in histograms
-plot_dat_hist=True
+plot_dat_hist=False
 bins=10
-plot_dat_scatter=True
-ref='viscosity'
+plot_dat_scatter=False
+#ref='T_annealing'
 # Print UMAP dimensionality reduction
 umap=False
 # Performed PCA explained variance. If == 0, skip
-pca_expl_var=0
+pca_expl_var=.95
 # Performed similarity tests
 simil_test=False
 # Short or long scores
@@ -57,15 +61,28 @@ sscaler=MinMaxScaler()
 #yname='weightam'
 #dropcols=['Exp','dry_thickness']
 # AM_LOADING
-#yname='am_loading'
-yname='visual_inspection'
-dropcols=['name']#,'visual_inspection']
+yname='am_categories'
+#yname='visual_inspection'
+dropcols=['name','shear_rate','am_loading','visual_inspection']
+# ICIAR
+##yname='abc'
+##dropcols=['sample','T_rampa_enf','T_annealing',\
+##        'position_muffle','Purity','code']
+# NICK
+##yname='size_distribution'
+##dropcols=['Exp']
 
 # Print classification/regression
-if classification:
-    print('\n     Classification fit')
+if al:
+    if classification:
+        print('\n     Active learning classification task')
+    else:
+        print('\n     Active learning regression task')
 else:
-    print('\n     Regression fit')
+    if classification:
+        print('\n     Classification fit')
+    else:
+        print('\n     Regression fit')
 # Read the raw numbers as pd.DataFrame
 print('\n -> Reading the data from', sys.argv[1])
 print('   Modelling \'', yname, '\' variable')
@@ -88,9 +105,15 @@ if plot_dat_scatter:
     plot.plot_scatter(x,ref,feat_names)
     exit()
 
+# Load and call active learning module
+if al:
+    import al
+    al.train(x,y,estimator[0],classification)
+    exit()
+
 # Remove features that are 0/1 in 80% of the cases
 if var_thresh:
-    x,dropped=fs.vt(x,feat_names)
+    dropped=fs.vt(x,feat_names)
 # Drop them from the original dataset. Just to be able to recover the original tags
     for i in dropped:
         x=x.drop(columns=[i])
@@ -124,7 +147,7 @@ if feat_sel:
     fs.rfecv(x_scal,y,feat_names,short_score,classification,estimator)
 
 if n_feats > x.shape[1]:
-    print('\n  Applied feature reduction PCA')
+    print('\n  Applied feature reduction')
     print('   Reduced from ',n_feats,' to ',x.shape[1],' features')
 
 print('\n -> Modellling with ',x.shape[1],' features')

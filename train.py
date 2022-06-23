@@ -197,7 +197,10 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
     print('   Validation curves calculated for each scoring function')
 # Set the parameters by cross-validation
     if classification:
-        scores=[None,'accuracy','balanced_accuracy','precision','recall','roc_auc','precision']
+        if class_dim == 2:
+            scores=[None,'accuracy','balanced_accuracy','precision','recall','roc_auc','precision']
+        else:
+            scores=[None,'balanced_accuracy','accuracy']
 #        scores=[None,'accuracy','balanced_accuracy','roc_auc_ovr','neg_log_loss','roc_auc_ovo',\
 #        'roc_auc_ovr_weighted','roc_auc_ovo_weighted']
     else:
@@ -216,17 +219,17 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
                             {'kernel': ['poly'],'gamma': ['scale', 'auto'], 'C': [.1,1, 10, 100],
                              'degree': [1,2,3,4,5]},
                             {'kernel': ['sigmoid'], 'gamma': ['scale', 'auto'], 'C': [.1,1, 10, 100]}]
-    elif estim_name=='GaussianProcessRegressor':
+    elif estim_name=='GaussianProcessRegressor' or estim_name=='GaussianProcessClassifier':
         rbf=RBF()
         ck=ConstantKernel()
         mat=Matern()
         default=None
-        tuned_parameters = [{'kernel':[rbf],}]#'RationalQuadratic','ExpSineSquared','DotProduct']}]
+        tuned_parameters = [{'kernel':[rbf]}]#'RationalQuadratic','ExpSineSquared','DotProduct']}]
     elif estim_name=='LogisticRegression':
         tuned_parameters = [{'penalty':['none'],'solver':['newton-cg','lbfgs','sag','saga']},
-        {'penalty':['l2'],'solver':['newton-cg','lbfgs','sag','saga'],'C': [.1,.3,.5,1,10,15]},
-        {'penalty':['l1'],'solver':['saga'],'C': [.1,.3,.5,1,10,15]},
-        {'penalty':['elasticnet'],'solver':['saga'],'C': [.1,.3,.5,1,10,15],'l1_ratio':[.1,.3,.5,.7,.9]}]
+        {'penalty':['l2'],'solver':['newton-cg','lbfgs','sag','saga'],'C': [.1,.3,.5,1,10,100]},
+        {'penalty':['l1'],'solver':['saga'],'C': [.1,.3,.5,1,10,100]},
+        {'penalty':['elasticnet'],'solver':['saga'],'C': [.1,.3,.5,1,10,100],'l1_ratio':[.1,.3,.5,.7,.9]}]
     elif estim_name=='SGDRegressor':
         tuned_parameters = [{'loss': ['squared_error'], 'alpha': [1e-5, 1e-4, 1e-3, 1e-2,.1,1],
                         'learning_rate': ['constant','optimal','invscaling','adaptive']},
@@ -255,8 +258,8 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
 #        {'power': [2], 'alpha': [0.3,.5,.7,.9,1,5,10]},
 #        {'power': [3], 'alpha': [0.3,.5,.7,.9,1,5,10]}]
     elif estim_name=='KNeighborsRegressor' or estim_name=='KNeighborsClassifier':
-        tuned_parameters = [{'weights':['uniform'],'p':[1,2,7],'n_neighbors':[2,3,4,5,6,7,8,9,10]},
-        {'weights':['distance'],'p':[1,2,7],'n_neighbors':[2,3,4,5,6,7,8,9,10]}]
+        tuned_parameters = [{'weights':['uniform','distance'],'p':[1,2,7],\
+                'n_neighbors':[2,4,6,8,10]}]
     elif estim_name=='DecisionTreeRegressor' or estim_name=='DecisionTreeClassifier':
 # Evaluate, in case of Decision Tree, the feature importances
         if feat_names != False:
@@ -286,7 +289,7 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
             {'splitter': ['random'], 'criterion': ['gini','entropy'],\
             'class_weight':['balanced',None],'ccp_alpha':[0.0,.5,1.0],\
             'max_features':['auto','sqrt','log2',None]}]
-    elif estim_name=='MLPRegressor':
+    elif estim_name=='MLPRegressor' or estim_name=='MLPClassifier':
         tuned_parameters = [
         {'solver':['lbfgs'],
             'alpha': [0,.001,.005,.01,.05,.1,.5,1,5,10]},
@@ -305,15 +308,15 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
             lambda v: "_".join(str(val) for val in v.values()))))
 # Print results
         if not classification:
-            if score in neg:
+            if not short_score and score in neg:
                 print('\n ·',score,':',-round(clf.score(x_test,y_test),4))
         else:
             print('\n ·',score,':',round(clf.score(x_test,y_test),4))
         print(results_df[['mean_test_score','std_test_score']].head(1))
         print(clf.best_estimator_)
 # Validation curve
-        if estim_name=='TweedieRegressor':
-            val_curve(clf.best_estimator_,score,estim_name,best_params_,x,y)
+#        if estim_name=='TweedieRegressor':
+#            val_curve(clf.best_estimator_,score,estim_name,clf.best_params_,x,y)
 # Learning curve
         l_curve(clf.best_estimator_,score,estim_name,clf.best_params_,x,y,clf.best_score_)
 
@@ -347,6 +350,14 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
         disp.plot()
         plt.savefig(estim_name+'_cm.png')
         print()
+    elif class_dim > 2:
+        print('\n  ~~~ Multi-class classification problem ~~~')
+# Perform predict on the test set
+        y_predict=clf.predict(x_test)
+# Print the actual set of parameters after CV tuning
+        print(clf.best_estimator_)
+        y_test=y_test.to_numpy()
+        print('Accuracy', metrics.accuracy_score(y_test, y_predict))
     return clf.best_params_
 
 def trainmod(x,y,feat_names,short_score,classification,estimator):
@@ -376,6 +387,12 @@ def trainmod(x,y,feat_names,short_score,classification,estimator):
             elif i == 'lr':
                 from sklearn.linear_model import LogisticRegression as LR
                 estimators_list.append(LR(max_iter=20000))
+            elif i == 'gp':
+                from sklearn.gaussian_process import GaussianProcessClassifier as GPC
+                estimators_list.append(GPC(n_restarts_optimizer=0))
+            elif i == 'nn':
+                from sklearn.neural_network import MLPClassifier as MLPC
+                estimators_list.append(MLPC(max_iter=10000))
         else:
             if i == 'knn':
                 from sklearn.neighbors import KNeighborsRegressor as KNR
@@ -388,9 +405,15 @@ def trainmod(x,y,feat_names,short_score,classification,estimator):
             elif i == 'dt':
                 from sklearn.tree import DecisionTreeRegressor as DTR
                 estimators_list.append(DTR())
-#        from sklearn.neural_network import MLPRegressor as MLPR
-#        from sklearn.linear_model import TweedieRegressor as TR
-#        from sklearn.gaussian_process import GaussianProcessRegressor as GPR
+            elif i == 'gp':
+                from sklearn.gaussian_process import GaussianProcessRegressor as GPR
+                estimators_list.append(GPR(n_restarts_optimizer=0))
+            elif i == 'linr':
+                from sklearn.linear_model import TweedieRegressor as TR
+                estimators_list.append(TR(power=0))
+            elif i == 'nn':
+                from sklearn.neural_network import MLPRegressor as MLPR
+                estimators_list.append(MLPR(max_iter=10000))
 # Create StandardScaler instance
     sscaler=StandardScaler()
 # Scale x
@@ -413,10 +436,6 @@ def trainmod(x,y,feat_names,short_score,classification,estimator):
 #    print('  Reduced from ',x.shape[1],' to ',x_train.shape[1],' features')
 
     print('\n  Tuning hyperparameters:\n')
-#    estimators_list.append(GPR(n_restarts_optimizer=10))
-#    estimators_list.append(DTR(random_state=42))
-#    estimators_list.append(MLPR(random_state=42,max_iter=10000))
-#    estimators_list.append(TR(power=0))
 #    estimators_list.append(TR(power=1))
 #    estimators_list.append(TR(power=2,max_iter=50000))
 #    estimators_list.append(TR(power=3,max_iter=50000))
@@ -429,17 +448,7 @@ def trainmod(x,y,feat_names,short_score,classification,estimator):
         print('  ~~~ Default parameters ~~~')
         i.fit(x_train,y_train)
         print(' ',i)
-        print('   Parameters:',i.get_params())
+#        print('   Parameters:',i.get_params())
         print('   Score:',i.score(x_test,y_test))
 # Perform cross-validation
         pars=gridsearchcv(i,x_train,y_train,x_test,y_test,x,y,feat_names,short_score,classification,class_dim)
-
-# Create instance of model SVM
-#    svr=svm.SVR()
-# Fit on training set
-#    svr.fit(x_train,y_train)
-#    y_pred=svr.predict(x_test)
-#    scores=cross_val_score(svr, x_train, y_train, cv=5)
-#    print(scores)
-#    print('Mean  Std')
-#    print(round(scores.mean(),2), round(scores.std(),2))

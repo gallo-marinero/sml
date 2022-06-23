@@ -22,10 +22,10 @@ def vt(x,feat_names):
     for i in range(len(feat_names)):
         if not selected[i]:
             dropped.append(feat_names[i])
-    print('Removed features:')
+    print(' Removed features:')
     for i in dropped:
-        print(' ',i)
-    return sel.transform(x), dropped
+        print('  ',i)
+    return dropped
 
 def plot_skb(x_train,y_train,x_test):
     print('Bar plots saved for Mutual information and F-regression.')
