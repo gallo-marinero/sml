@@ -66,39 +66,37 @@ def l_curve(estim,score,estim_name,params,x,y,best_score):
 
 def val_curve(estim,score,estim_name,params,x,y):
 # Extract list to dict
-    params=params[0]
-    for key in params:
-      if key=='alpha':
-        param_range= np.logspace(-5, 6, 11)
+#key=params['alpha']
+    param_range= np.logspace(-7, 12, 19)
 #        param_range= np.array([0,.01,.02,.04,.08,.1,.3,.7,1,2,5])
 #        param_range= np.array(params[key])
-        train_scores,test_scores=validation_curve(estim,x,y,param_name=key,
+    train_scores,test_scores=validation_curve(estim,x,y,param_name='alpha',
                 param_range=param_range,scoring=score)
 # Print
-        train_scores_mean = np.mean(train_scores, axis=1)
-        train_scores_std = np.std(train_scores, axis=1)
-        test_scores_mean = np.mean(test_scores, axis=1)
-        test_scores_std = np.std(test_scores, axis=1)
+    train_scores_mean = np.mean(train_scores, axis=1)
+    train_scores_std = np.std(train_scores, axis=1)
+    test_scores_mean = np.mean(test_scores, axis=1)
+    test_scores_std = np.std(test_scores, axis=1)
 
-        plt.title('Validation Curve with '+estim_name)
-        plt.xlabel(r'$\alpha$')
-        plt.ylabel(score)
-        lw = 2
-        plt.semilogx(param_range, train_scores_mean, label="Training score",
+    plt.title('Validation Curve with '+estim_name)
+    plt.xlabel(r'$\alpha$')
+    plt.ylabel(score)
+    lw = 2
+    plt.semilogx(param_range, train_scores_mean, label="Training score",
 #        plt.plot(param_range, train_scores_mean, label="Training score",
              color="darkorange", lw=lw)
-        plt.fill_between(param_range, train_scores_mean - train_scores_std,
+    plt.fill_between(param_range, train_scores_mean - train_scores_std,
                  train_scores_mean + train_scores_std, alpha=0.2,
                  color="darkorange", lw=lw)
-        plt.semilogx(param_range, test_scores_mean, label="Cross-validation score",
+    plt.semilogx(param_range, test_scores_mean, label="Cross-validation score",
 #        plt.plot(param_range, test_scores_mean, label="Cross-validation score",
              color="navy", lw=lw)
-        plt.fill_between(param_range,test_scores_mean - test_scores_std,
+    plt.fill_between(param_range,test_scores_mean - test_scores_std,
                  test_scores_mean + test_scores_std, alpha=0.2,
                  color="navy", lw=lw)
-        plt.legend(loc="best")
-        plt.savefig(estim_name+'_'+score+'_vc.png')
-        plt.clf()
+    plt.legend(loc="best")
+    plt.savefig(estim_name+'_'+score+'_vc.png')
+    plt.clf()
 #        plt.show()
 
 def corrected_std(diff, n_train, n_test):
@@ -307,16 +305,16 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
         results_df = (results_df.set_index(results_df["params"].apply(
             lambda v: "_".join(str(val) for val in v.values()))))
 # Print results
-        if not classification:
-            if not short_score and score in neg:
+        if not classification and not short_score and score in neg:
                 print('\n ·',score,':',-round(clf.score(x_test,y_test),4))
         else:
             print('\n ·',score,':',round(clf.score(x_test,y_test),4))
         print(results_df[['mean_test_score','std_test_score']].head(1))
         print(clf.best_estimator_)
 # Validation curve
-#        if estim_name=='TweedieRegressor':
-#            val_curve(clf.best_estimator_,score,estim_name,clf.best_params_,x,y)
+        if 'MLP' or 'Twee' in estim_name:
+            if score:
+                val_curve(clf.best_estimator_,score,estim_name,clf.best_params_,x,y)
 # Learning curve
         l_curve(clf.best_estimator_,score,estim_name,clf.best_params_,x,y,clf.best_score_)
 
@@ -358,6 +356,14 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
         print(clf.best_estimator_)
         y_test=y_test.to_numpy()
         print('Accuracy', metrics.accuracy_score(y_test, y_predict))
+    elif not classification:
+        print('\n  ~~~ Regression problem ~~~')
+# Perform predict on the test set
+        y_predict=clf.predict(x_test)
+# Print the actual set of parameters after CV tuning
+        print(clf.best_estimator_)
+        y_test=y_test.to_numpy()
+        print('r2', metrics.r2_score(y_test, y_predict))
     return clf.best_params_
 
 def trainmod(x,y,feat_names,short_score,classification,estimator):
@@ -367,12 +373,12 @@ def trainmod(x,y,feat_names,short_score,classification,estimator):
         if classification:
 # If it is a classification problem, find out number of classes and counts
             unique, counts=np.unique(y,return_counts=True)
-            print('  ',len(unique),'clases')
-            print('  Class  Counts')
+            print('    ',len(unique),'clases')
+            print('     Class  Counts')
 # Store number of classes in class_dim
             class_dim= len(unique)
             for j in range(class_dim):
-                print('   ',unique[j],'  ',counts[j])
+                print('      ',unique[j],'    ',counts[j])
             if i == 'knn':
                 from sklearn.neighbors import KNeighborsClassifier as KNC
                 estimators_list.append(KNC(n_neighbors=4))
@@ -387,6 +393,9 @@ def trainmod(x,y,feat_names,short_score,classification,estimator):
             elif i == 'lr':
                 from sklearn.linear_model import LogisticRegression as LR
                 estimators_list.append(LR(max_iter=20000))
+            elif i == 'linr':
+                print('\n  This algorithm is only available for regression tasks.')
+                exit()
             elif i == 'gp':
                 from sklearn.gaussian_process import GaussianProcessClassifier as GPC
                 estimators_list.append(GPC(n_restarts_optimizer=0))
@@ -401,7 +410,7 @@ def trainmod(x,y,feat_names,short_score,classification,estimator):
                 estimators_list.append(svm.SVR())
             elif i == 'sgd':
                 from sklearn.linear_model import SGDRegressor as SGDR
-                estimators_list.append(SGDR())
+                estimators_list.append(SGDR(max_iter=10000))
             elif i == 'dt':
                 from sklearn.tree import DecisionTreeRegressor as DTR
                 estimators_list.append(DTR())

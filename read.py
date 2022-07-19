@@ -1,30 +1,30 @@
-import sys, os, matplotlib, time, os.path
-import numpy as np
 import pandas as pd
-#import statistics as st
-#from matplotlib import use
-#import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
-from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler,MinMaxScaler
-from sklearn.model_selection import train_test_split
-from sklearn.model_selection import cross_val_score
-import plot, train, tests, fs, predict_evaluate
+from importlib import import_module
+import sys,plot, train, tests, fs, al_boss, os
 #from umap import UMAP
 
+# Define input variables
+vrbls=['classification','al','estimator','var_thresh','feat_sel',\
+        'plot_dat_hist','bins','plot_dat_hist','umap','simil_test',\
+        'feat_names','short_score','yname','dropcols','data_f']
+
+# ~ Defaults definition~
 # Regression problem by default
-classification=True
+classification=False
 al=False
-# Choose the estimator
+# Available estimators:
 # Linear regression (Tweedie Regressor): linr
 # K-Nearest Neighbors: knn
 # Support Vector Machine: svm
 # Stochastic Gradient Descent: sgd
 # Decission Tree: dt
 # Logistic Regression (classification only): lr
-# Gaussian process: gp
+# Gaussian process: gp # NOT READY!
 # Neural network: nn
-estimator=['knn']
+# Default estimator:
+estimator=['dt']
 # Remove features repeated >80% of the time
 var_thresh=False
 # Perform feature selection
@@ -37,7 +37,7 @@ plot_dat_scatter=False
 # Print UMAP dimensionality reduction
 umap=False
 # Performed PCA explained variance. If == 0, skip
-pca_expl_var=.95
+pca_expl_var=0
 # Performed similarity tests
 simil_test=False
 # Short or long scores
@@ -45,48 +45,42 @@ short_score=True
 # Pass feature names
 feat_names=False
 
+# Read input from file
+# Add path where code is executed to be able to load the input file as a module
+sys.path.append(os.getcwd())
+# Import variables in input file
+inp_f=__import__(sys.argv[1])
+# For all variables, if present in the input file, overwrite default value
+for i in vrbls:
+# Check if the variable is present in input file
+    if hasattr(inp_f,i):
+# Update variable
+        globals()[i] = getattr(inp_f,i)
+
+if al:
+    print('\n     Active learning task')
+    al_boss.boss(sys.argv[1])
+else:
+    if classification:
+        print('\n    ~ Classification fit ~')
+        print('\n    ----------------------')
+    else:
+        print('\n    ~ Regression fit ~')
+        print('\n    ------------------')
+print('\n -> Reading the data from', data_f)
+print('\n -> Modelling \'', yname, '\' variable')
+print('\n -> Droping features: ')
+for i in dropcols:
+    print('    ',i)
+print('\n -> Using estimator: ')
+for i in estimator:
+    print('    ',i)
+
 # Create StandardScaler instance
 #sscaler=StandardScaler()
 sscaler=MinMaxScaler()
 
-#POUCH
-#yname='cathode_am_mass'
-#yname='n_cycles_qretention80'
-# Title of the columns that are to be dropped (if none, leave empty dropcols=[])
-#dropcols=['Airflow2','Jar','Sample','Exp','Active_Material','Liquid_content','Carbon','Binder','Dry_thickness']
-#pouchdropcols=['pouch_cell','n_cycles_qe99']
-#pouchdropcols=['pouch_cell','anode_thickness','membrane_fabrication','membrane_composition','manual_sealing','viscosity','web_speed','drying_z1','flow_z1','drying_z2','flow_z2','wet_thickness','drying_speed','alu_mass','n_cycles_qe99','rate_capability']
-#dropcols=['pouch_cell']
-# AJURIA
-#yname='weightam'
-#dropcols=['Exp','dry_thickness']
-# AM_LOADING
-yname='am_categories'
-#yname='visual_inspection'
-dropcols=['name','shear_rate','am_loading','visual_inspection']
-# ICIAR
-##yname='abc'
-##dropcols=['sample','T_rampa_enf','T_annealing',\
-##        'position_muffle','Purity','code']
-# NICK
-##yname='size_distribution'
-##dropcols=['Exp']
-
-# Print classification/regression
-if al:
-    if classification:
-        print('\n     Active learning classification task')
-    else:
-        print('\n     Active learning regression task')
-else:
-    if classification:
-        print('\n     Classification fit')
-    else:
-        print('\n     Regression fit')
-# Read the raw numbers as pd.DataFrame
-print('\n -> Reading the data from', sys.argv[1])
-print('   Modelling \'', yname, '\' variable')
-x=pd.read_csv(sys.argv[1])
+x=pd.read_csv(data_f)
 # Loop over the columns that should be dropped
 for i in dropcols:
     x=x.drop(columns=[i])
@@ -150,7 +144,7 @@ if n_feats > x.shape[1]:
     print('\n  Applied feature reduction')
     print('   Reduced from ',n_feats,' to ',x.shape[1],' features')
 
-print('\n -> Modellling with ',x.shape[1],' features')
+print('\n -> Modelling with ',x.shape[1],' features')
 # Train models and get scores. x,y are not scaled
 train.trainmod(x,y,feat_names,short_score,classification,estimator)
 
