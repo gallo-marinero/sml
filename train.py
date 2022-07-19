@@ -312,7 +312,8 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
         print(results_df[['mean_test_score','std_test_score']].head(1))
         print(clf.best_estimator_)
 # Validation curve
-        if 'MLP' or 'Twee' in estim_name:
+        if 'alpha' in tuned_parameters:
+            print(estim_name)
             if score:
                 val_curve(clf.best_estimator_,score,estim_name,clf.best_params_,x,y)
 # Learning curve
