@@ -2,13 +2,13 @@ import pandas as pd
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler,MinMaxScaler
 from importlib import import_module
-import sys,plot, train, tests, fs, al_boss, os
+import sys,plot, train, tests, fs, al_boss, os,pp
 #from umap import UMAP
 
 # Define input variables
 vrbls=['classification','al','estimator','var_thresh','feat_sel',\
         'plot_dat_hist','bins','plot_dat_hist','umap','simil_test',\
-        'feat_names','short_score','yname','dropcols','data_f']
+        'feat_names','short_score','yname','dropcols','data_f','poly_feat']
 
 # ~ Defaults definition~
 # Regression problem by default
@@ -25,6 +25,8 @@ al=False
 # Neural network: nn
 # Default estimator:
 estimator=['dt']
+# Some preprocessing
+poly_feat=False
 # Remove features repeated >80% of the time
 var_thresh=False
 # Perform feature selection
@@ -98,6 +100,10 @@ if plot_dat_hist:
 if plot_dat_scatter:
     plot.plot_scatter(x,ref,feat_names)
     exit()
+
+# Call preprocesing
+if poly_feat:
+    x=pp.polynomial_features(x,poly_feat)
 
 # Load and call active learning module
 if al:

@@ -64,13 +64,13 @@ def l_curve(estim,score,estim_name,params,x,y,best_score):
     plt.clf()
 #    plt.show()
 
-def val_curve(estim,score,estim_name,params,x,y):
+def val_curve(estim,score,estim_name,key,x,y):
+    print('\n  ~~~ Validation curves is being calculated ~~~')
 # Extract list to dict
-#key=params['alpha']
     param_range= np.logspace(-7, 12, 19)
 #        param_range= np.array([0,.01,.02,.04,.08,.1,.3,.7,1,2,5])
 #        param_range= np.array(params[key])
-    train_scores,test_scores=validation_curve(estim,x,y,param_name='alpha',
+    train_scores,test_scores=validation_curve(estim,x,y,param_name=key,
                 param_range=param_range,scoring=score)
 # Print
     train_scores_mean = np.mean(train_scores, axis=1)
@@ -79,7 +79,7 @@ def val_curve(estim,score,estim_name,params,x,y):
     test_scores_std = np.std(test_scores, axis=1)
 
     plt.title('Validation Curve with '+estim_name)
-    plt.xlabel(r'$\alpha$')
+    plt.xlabel(key)
     plt.ylabel(score)
     lw = 2
     plt.semilogx(param_range, train_scores_mean, label="Training score",
@@ -96,6 +96,7 @@ def val_curve(estim,score,estim_name,params,x,y):
                  color="navy", lw=lw)
     plt.legend(loc="best")
     plt.savefig(estim_name+'_'+score+'_vc.png')
+    print('    Saved to '+estim_name+'_'+score+'_vc.png')
     plt.clf()
 #        plt.show()
 
@@ -188,11 +189,10 @@ def covar_print(results_df,score,estim_name):
 
 def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
         short_score,classification,class_dim):
-    print('\n  Set with',x.shape[0],'samples and ',x.shape[1],'features')
+    print('\n  Set with',x.shape[0],'samples and',x.shape[1],'features')
     print('  Training set size: ',x_train.shape[0])
     print('  Test set size: ',x_test.shape[0],'\n')
     print('  ~~~ Tuning of the parameters ~~~')
-    print('   Validation curves calculated for each scoring function')
 # Set the parameters by cross-validation
     if classification:
         if class_dim == 2:
@@ -212,11 +212,14 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
             scores=scores+neg
     estim_name=estimator.__class__.__name__
     if estim_name=='SVR' or estim_name=='SVC':
-        tuned_parameters = [{'kernel': ['rbf'],'gamma': ['scale', 'auto'], 'C': [1, 10, 100, 1000]},
-                            {'kernel': ['linear'],'gamma': ['scale', 'auto'], 'C': [.1,1, 10, 100]},
-                            {'kernel': ['poly'],'gamma': ['scale', 'auto'], 'C': [.1,1, 10, 100],
-                             'degree': [1,2,3,4,5]},
-                            {'kernel': ['sigmoid'], 'gamma': ['scale', 'auto'], 'C': [.1,1, 10, 100]}]
+        tuned_parameters = [{'kernel': ['rbf'],'gamma': ['scale', 'auto'],
+                                'C': [.001,.01,.1,1, 10, 100, 1000]},
+                            {'kernel': ['linear'],'gamma': ['scale', 'auto'],
+                                'C': [.001,.01,.1,1, 10, 100]},
+                            {'kernel': ['poly'],'gamma': ['scale', 'auto'], 'C':
+                                [.001,.01,.1,1, 10, 100], 'degree': [1,2,3,4,5]},
+                            {'kernel': ['sigmoid'], 'gamma': ['scale', 'auto'],
+                                'C': [.001,.01,.1,1, 10, 100]}]
     elif estim_name=='GaussianProcessRegressor' or estim_name=='GaussianProcessClassifier':
         rbf=RBF()
         ck=ConstantKernel()
@@ -225,9 +228,9 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
         tuned_parameters = [{'kernel':[rbf]}]#'RationalQuadratic','ExpSineSquared','DotProduct']}]
     elif estim_name=='LogisticRegression':
         tuned_parameters = [{'penalty':['none'],'solver':['newton-cg','lbfgs','sag','saga']},
-        {'penalty':['l2'],'solver':['newton-cg','lbfgs','sag','saga'],'C': [.1,.3,.5,1,10,100]},
-        {'penalty':['l1'],'solver':['saga'],'C': [.1,.3,.5,1,10,100]},
-        {'penalty':['elasticnet'],'solver':['saga'],'C': [.1,.3,.5,1,10,100],'l1_ratio':[.1,.3,.5,.7,.9]}]
+        {'penalty':['l2'],'solver':['newton-cg','lbfgs','sag','saga'],'C': [.001,.01,.1,1,10,100]},
+        {'penalty':['l1'],'solver':['saga'],'C': [.001,.01,.1,1,10,100]},
+        {'penalty':['elasticnet'],'solver':['saga'],'C': [.001,.01,.1,1,10,100],'l1_ratio':[.1,.3,.5,.7,.9]}]
     elif estim_name=='SGDRegressor':
         tuned_parameters = [{'loss': ['squared_error'], 'alpha': [1e-5, 1e-4, 1e-3, 1e-2,.1,1],
                         'learning_rate': ['constant','optimal','invscaling','adaptive']},
@@ -311,11 +314,15 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
             print('\n ·',score,':',round(clf.score(x_test,y_test),4))
         print(results_df[['mean_test_score','std_test_score']].head(1))
         print(clf.best_estimator_)
-# Validation curve
-        if 'alpha' in tuned_parameters:
-            print(estim_name)
+# Validation curve only if regularization parameter is defined for estimator
+        key=None
+        if estim_name == 'MLPClassifier':
+            key='alpha'
+        elif estim_name == 'LogisticRegression' or estim_name == 'SVC':
+            key='C'
+        if key:
             if score:
-                val_curve(clf.best_estimator_,score,estim_name,clf.best_params_,x,y)
+                val_curve(clf.best_estimator_,score,estim_name,key,x,y)
 # Learning curve
         l_curve(clf.best_estimator_,score,estim_name,clf.best_params_,x,y,clf.best_score_)
 
@@ -452,12 +459,12 @@ def trainmod(x,y,feat_names,short_score,classification,estimator):
     for i in estimators_list:
 # Evaluate the models straight away (no cv) to check gross performance
         estim_name=i.__class__.__name__
-        print('  ------------------------------------')
+        print('\n  ------------------------------------')
         print(' ',estim_name,'- Best set found for',':')
         print('  ------------------------------------\n')
         print('  ~~~ Default parameters ~~~')
         i.fit(x_train,y_train)
-        print(' ',i)
+        print('  ',i)
 #        print('   Parameters:',i.get_params())
         print('   Score:',i.score(x_test,y_test))
 # Perform cross-validation
