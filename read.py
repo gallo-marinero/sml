@@ -8,7 +8,8 @@ import sys,plot, train, tests, fs, al_boss, os,pp
 # Define input variables
 vrbls=['classification','al','estimator','var_thresh','feat_sel',\
         'plot_dat_hist','bins','plot_dat_hist','umap','simil_test',\
-        'feat_names','short_score','yname','dropcols','data_f','poly_feat']
+        'feat_names','short_score','yname','dropcols','data_f','gen_feat',\
+        'spline_knots']
 
 # ~ Defaults definition~
 # Regression problem by default
@@ -26,7 +27,11 @@ al=False
 # Default estimator:
 estimator=['dt']
 # Some preprocessing
-poly_feat=False
+# gen_feat contains the degree
+gen_feat=False
+# Whether to use spline transformation (polynomial is default)
+# Use value as knots
+spline_knots=False
 # Remove features repeated >80% of the time
 var_thresh=False
 # Perform feature selection
@@ -102,8 +107,11 @@ if plot_dat_scatter:
     exit()
 
 # Call preprocesing
-if poly_feat:
-    x=pp.polynomial_features(x,poly_feat)
+if gen_feat:
+    if spline_knots:
+        x=pp.spline_features(x,gen_feat,spline_knots)
+    else:
+        x=pp.polynomial_features(x,gen_feat)
 
 # Load and call active learning module
 if al:
