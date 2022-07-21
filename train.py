@@ -299,7 +299,8 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
 
     for score in scores:
 # Declare the GridSearchCV strategy
-        clf = GridSearchCV(estimator, tuned_parameters, scoring=score)
+        clf = GridSearchCV(estimator, tuned_parameters,
+                scoring=score,return_train_score=True)
         clf.fit(x_train, y_train)
 # Prepare the dataframe with results, to print the mean and standard deviation
 # of the test score for the best set of parameters
@@ -312,11 +313,11 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
                 print('\n ·',score,':',-round(clf.score(x_test,y_test),4))
         else:
             print('\n ·',score,':',round(clf.score(x_test,y_test),4))
-        print(results_df[['mean_test_score','std_test_score']].head(1))
+        print(results_df[['mean_test_score','std_test_score','mean_train_score','std_train_score']].head(1))
         print(clf.best_estimator_)
 # Validation curve only if regularization parameter is defined for estimator
         key=None
-        if estim_name == 'MLPClassifier':
+        if estim_name == 'MLPClassifier' or estim_name == 'TweedieRegressor':
             key='alpha'
         elif estim_name == 'LogisticRegression' or estim_name == 'SVC':
             key='C'
