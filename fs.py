@@ -70,6 +70,7 @@ def skb(x,y,feat_names,short_score,classification,estimator):
     model=TR(power=0,max_iter=2000)
     for i in range(3):
         if i==0:
+            print('\n')
             print('\n ~ Fit with all features ~ ')
 # Evaluate the model with all features in predict_evaluate.py module
             x_train,y_train,x_test,y_test,eval_model=predict_evaluate.pred_eval(x,y,model)
@@ -88,6 +89,7 @@ def skb(x,y,feat_names,short_score,classification,estimator):
 
 # Configure to select all features
         elif i !=0:
+            print('\n')
             if i == 1:
                 print('\n ~ Features according to mutual information ~ ')
                 score_f=mutual_info_regression
@@ -121,7 +123,7 @@ def skb(x,y,feat_names,short_score,classification,estimator):
             skb_bestk(x,y,results.best_params_['sel__k'],model,score_f,feat_names,short_score,classification,estimator)
 
 def rfecv(x,y,feat_names,short_score,classification,estimator):
-    print('\n ~ Recursive feature elmination with cross-validation ~ ')
+    print('\n\n ~ Recursive feature elimination with cross-validation ~ ')
     model = TR(max_iter=2000)
     cv = RepeatedKFold(n_splits=5, n_repeats=3, random_state=1)
     rfecv = RFECV(estimator=model,cv=cv)#,n_features_to_select=i)

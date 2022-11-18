@@ -7,16 +7,16 @@ import sys,plot, train, tests, fs, al_boss, os,pp
 
 # Define input variables
 vrbls=['classification','al','estimator','var_thresh','feat_sel',\
-        'plot_dat_hist','bins','plot_dat_hist','umap','simil_test',\
+        'bins','plot_dat_hist','umap','simil_test','spline_knots',\
         'feat_names','short_score','yname','dropcols','data_f','gen_feat',\
-        'spline_knots']
+        'pca_expl_var']
 
 # ~ Defaults definition~
 # Regression problem by default
 classification=False
 al=False
 # Available estimators:
-# Linear regression (Tweedie Regressor): linr
+# Linear Regression (Tweedie Regressor): linr
 # K-Nearest Neighbors: knn
 # Support Vector Machine: svm
 # Stochastic Gradient Descent: sgd

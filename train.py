@@ -21,12 +21,18 @@ def l_curve(estim,score,estim_name,params,x,y,best_score):
     axes[0].set_title('Learning curve '+estim_name)
     axes[0].set_xlabel("Training examples")
     axes[0].set_ylabel(str(score))
-
     train_sizes,train_scores,test_scores,fit_times,score_times=learning_curve(
-    estim,x,y,train_sizes=np.linspace(.1,1.0,7),cv=cv,return_times=True,shuffle=False)
+    estim,x,y,train_sizes=np.linspace(.1,1.0,7),cv=cv,return_times=True,shuffle=True)
     train_scores_mean = np.mean(train_scores, axis=1)
+# Print train and test scores with full size of database (sometimes hard to read
+# from the graph)
+    print('     Final scores of the learning curve')
+    train_sc=train_scores_mean[len(train_scores_mean)-1]
+    print('      Training = ',round(train_sc,4))
     train_scores_std = np.std(train_scores, axis=1)
     test_scores_mean = np.mean(test_scores, axis=1)
+    test_sc=test_scores_mean[len(test_scores_mean)-1]
+    print('      Test = ',round(test_sc,4))
     test_scores_std = np.std(test_scores, axis=1)
     fit_times_mean = np.mean(fit_times, axis=1)
     fit_times_std = np.std(fit_times, axis=1)
@@ -193,6 +199,7 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
     print('  Training set size: ',x_train.shape[0])
     print('  Test set size: ',x_test.shape[0],'\n')
     print('  ~~~ Tuning of the parameters ~~~')
+    print('   Scores performed on test set')
 # Set the parameters by cross-validation
     if classification:
         if class_dim == 2:
@@ -202,13 +209,15 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
 #        scores=[None,'accuracy','balanced_accuracy','roc_auc_ovr','neg_log_loss','roc_auc_ovo',\
 #        'roc_auc_ovr_weighted','roc_auc_ovo_weighted']
     else:
-# If short_score=True, evaluate only nonneg scores
-        scores=[None,'explained_variance','max_error','r2']
-        if not short_score:
-            neg=['neg_mean_absolute_error','neg_mean_squared_error',\
+# If short_score=True, evaluate only scores. If False, also neg
+        scores=[None,'explained_variance','max_error','r2',\
+                'neg_mean_absolute_error','neg_mean_squared_error',\
+                'neg_mean_absolute_percentage_error']
+        neg=['neg_mean_absolute_error','neg_mean_squared_error',\
         'neg_root_mean_squared_error','neg_mean_squared_log_error',\
         'neg_median_absolute_error','neg_mean_gamma_deviance','neg_mean_absolute_percentage_error']
 # Evaluate all scores
+        if not short_score:
             scores=scores+neg
     estim_name=estimator.__class__.__name__
     if estim_name=='SVR' or estim_name=='SVC':
@@ -309,8 +318,11 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
         results_df = (results_df.set_index(results_df["params"].apply(
             lambda v: "_".join(str(val) for val in v.values()))))
 # Print results
-        if not classification and not short_score and score in neg:
+        if not classification:
+            if score in neg:
                 print('\n ·',score,':',-round(clf.score(x_test,y_test),4))
+            else:
+                print('\n ·',score,':',round(clf.score(x_test,y_test),4))
         else:
             print('\n ·',score,':',round(clf.score(x_test,y_test),4))
         print(results_df[['mean_test_score','std_test_score','mean_train_score','std_train_score']].head(1))
@@ -367,6 +379,7 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
         print('Accuracy', metrics.accuracy_score(y_test, y_predict))
     elif not classification:
         print('\n  ~~~ Regression problem ~~~')
+        print('   Prediction accuracy on test set')
 # Perform predict on the test set
         y_predict=clf.predict(x_test)
 # Print the actual set of parameters after CV tuning
@@ -453,7 +466,8 @@ def trainmod(x,y,feat_names,short_score,classification,estimator):
 #    print('\n-> Applied feature reduction PCA')
 #    print('  Reduced from ',x.shape[1],' to ',x_train.shape[1],' features')
 
-    print('\n  Tuning hyperparameters:\n')
+    print('\n  Tuning hyperparameters:')
+    print('   Scores performed on test set\n')
 #    estimators_list.append(TR(power=1))
 #    estimators_list.append(TR(power=2,max_iter=50000))
 #    estimators_list.append(TR(power=3,max_iter=50000))
