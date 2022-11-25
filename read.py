@@ -65,8 +65,10 @@ for i in vrbls:
         globals()[i] = getattr(inp_f,i)
 
 if al:
-    print('\n     Active learning task')
-    al_boss.boss(sys.argv[1])
+    print('\n     ~ Active learning task ~')
+    print('\n     ------------------------\n')
+    al_boss.boss(data_f)
+    exit()
 else:
     if classification:
         print('\n    ~ Classification fit ~')
@@ -159,7 +161,7 @@ if n_feats > x.shape[1]:
     print('   Reduced from ',n_feats,' to ',x.shape[1],' features')
 
 print('\n -> Modelling with ',x.shape[1],' features')
-# Train models and get scores. x,y are not scaled
+# If it is no active learning task, train models and get scores. x,y are not scaled
 train.trainmod(x,y,feat_names,short_score,classification,estimator)
 
 # Evaluate model

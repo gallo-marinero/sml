@@ -22,18 +22,19 @@ def l_curve(estim,score,estim_name,params,x,y,best_score):
     axes[0].set_xlabel("Training examples")
     axes[0].set_ylabel(str(score))
     train_sizes,train_scores,test_scores,fit_times,score_times=learning_curve(
-    estim,x,y,train_sizes=np.linspace(.1,1.0,7),cv=cv,return_times=True,shuffle=True)
+    estim,x,y,scoring=score,train_sizes=np.linspace(.1,1.0,7),\
+            cv=cv,return_times=True,shuffle=True)
     train_scores_mean = np.mean(train_scores, axis=1)
 # Print train and test scores with full size of database (sometimes hard to read
 # from the graph)
     print('     Final scores of the learning curve')
-    train_sc=train_scores_mean[len(train_scores_mean)-1]
+    train_sc=abs(train_scores_mean[len(train_scores_mean)-1])
     print('      Training = ',round(train_sc,4))
-    train_scores_std = np.std(train_scores, axis=1)
-    test_scores_mean = np.mean(test_scores, axis=1)
-    test_sc=test_scores_mean[len(test_scores_mean)-1]
+    train_scores_std = abs(np.std(train_scores, axis=1))
+    test_scores_mean = abs(np.mean(test_scores, axis=1))
+    test_sc=abs(test_scores_mean[len(test_scores_mean)-1])
     print('      Test = ',round(test_sc,4))
-    test_scores_std = np.std(test_scores, axis=1)
+    test_scores_std = abs(np.std(test_scores, axis=1))
     fit_times_mean = np.mean(fit_times, axis=1)
     fit_times_std = np.std(fit_times, axis=1)
     # Plot learning curve
@@ -64,7 +65,7 @@ def l_curve(estim,score,estim_name,params,x,y,best_score):
     axes[2].set_ylabel(str(score))
     axes[2].set_title("Performance of the model")
     if estim_name == 'TweedieRegressor':
-        plt.savefig(estim_name+'_power'+str(estim.get_params()['power'])+'_lc.png')
+        plt.savefig(estim_name+'_power'+str(estim.get_params()['power'])+'_'+str(score)+'_lc.png')
     else:
         plt.savefig(estim_name+'_'+str(score)+'_lc.png')
     plt.clf()
@@ -378,14 +379,20 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
         y_test=y_test.to_numpy()
         print('Accuracy', metrics.accuracy_score(y_test, y_predict))
     elif not classification:
-        print('\n  ~~~ Regression problem ~~~')
-        print('   Prediction accuracy on test set')
-# Perform predict on the test set
-        y_predict=clf.predict(x_test)
+        print('\n            Summary           ')
+        print('            -------           ')
+        print('   ~~~ Regression problem ~~~')
 # Print the actual set of parameters after CV tuning
         print(clf.best_estimator_)
+        print(' Prediction accuracy on test set')
+# Perform predict on the test set
+        y_predict=clf.predict(x_test)
         y_test=y_test.to_numpy()
-        print('r2', metrics.r2_score(y_test, y_predict))
+        print('     r2', metrics.r2_score(y_test, y_predict))
+        print('     Max error', metrics.max_error(y_test, y_predict))
+        print('     MAE', metrics.mean_absolute_error(y_test, y_predict))
+        print('     MSE', metrics.mean_squared_error(y_test, y_predict))
+        print('     MA%E', metrics.mean_absolute_percentage_error(y_test, y_predict))
     return clf.best_params_
 
 def trainmod(x,y,feat_names,short_score,classification,estimator):
