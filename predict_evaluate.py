@@ -3,8 +3,8 @@ from sklearn.linear_model import TweedieRegressor as TR
 from sklearn.model_selection import train_test_split
 
 def pred_eval(x,y,model):
-    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.33,
-            random_state=42)
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.33)#,
+#            random_state=42)
 # Fit the data to a Linear regression
     model.fit(x_train,y_train)
 # Evaluate the model

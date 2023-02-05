@@ -1,6 +1,7 @@
 import pandas as pd
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler,MinMaxScaler
+from sklearn.model_selection import KFold
 from importlib import import_module
 import sys,plot, train, tests, fs, al_boss, os,pp
 #from umap import UMAP
@@ -51,6 +52,8 @@ simil_test=False
 short_score=True
 # Pass feature names
 feat_names=False
+# Cross-validation settings
+cv=KFold(n_splits=10,shuffle=True,random_state=42)
 
 # Read input from file
 # Add path where code is executed to be able to load the input file as a module
@@ -152,9 +155,9 @@ if simil_test:
 if feat_sel:
     print('\n-> Performing feature selection')
 # Perform MI and F-reg. Select according to SelectKBest
-    fs.skb(x_scal,y,feat_names,short_score,classification,estimator)
+    fs.skb(x_scal,y,feat_names,short_score,classification,estimator,cv)
 # Perform recursive feature elimination with cross-validation
-    fs.rfecv(x_scal,y,feat_names,short_score,classification,estimator)
+    fs.rfecv(x_scal,y,feat_names,short_score,classification,estimator,cv)
 
 if n_feats > x.shape[1]:
     print('\n  Applied feature reduction')
@@ -162,7 +165,7 @@ if n_feats > x.shape[1]:
 
 print('\n -> Modelling with ',x.shape[1],' features')
 # If it is no active learning task, train models and get scores. x,y are not scaled
-train.trainmod(x,y,feat_names,short_score,classification,estimator)
+train.trainmod(x,y,feat_names,short_score,classification,estimator,cv)
 
 # Evaluate model
 ##predict_evaluate.pred_eval(x,y,model)
