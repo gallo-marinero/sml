@@ -5,6 +5,7 @@ from sklearn.decomposition import PCA
 from umap import UMAP
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
+from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
 # Perform PCA component analysis
 def pca_feat(x,crit,v):
 # If an integer is given, perform PCA for crit number of components
@@ -72,3 +73,14 @@ def plot_scatter(x,ref,feat_names):
             plt.scatter(new_y,new_x[feat_names[i]],alpha=.7)
         plt.savefig('scatter_'+feat_names[i]+'_vs_'+ref+'.png')
         plt.close() 
+
+# Plot confusion matrix
+def plot_confmat_multi(y_test,y_predict,estimator,unique):
+    fig, ax = plt.subplots(figsize=(8, 5))
+    cmp = ConfusionMatrixDisplay(
+        confusion_matrix(y_test, y_predict),
+        display_labels=unique
+    )
+
+    cmp.plot(ax=ax)
+    plt.savefig('cf_'+str(estimator)+'.png');
