@@ -257,10 +257,10 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
 #        {'penalty':['elasticnet'],'class_weight':['balanced',None]}]
         tuned_parameters = [{'penalty':['l2'],\
                 'solver':['liblinear','newton-cholesky','newton-cg','lbfgs','sag','saga'],\
-                'class_weight':[None,'balanced'],'C':[.00001,.0001,.001,.01,.1,1,10,100]},\
-        {'penalty':['l1'],'solver':['liblinear','saga'],'C':[.00001,.0001,.001,.01,.1,1,10,100],\
+                'class_weight':[None,'balanced'],'C':np.geomspace(1e-6,100.0,9)},\
+        {'penalty':['l1'],'solver':['liblinear','saga'],'C':np.geomspace(1e-6,100.0,9),\
                     'class_weight':[None,'balanced']},
-        {'penalty':['elasticnet'],'solver':['saga'],'C':[.00001,.0001,.001,.01,.1,1,10,100],\
+        {'penalty':['elasticnet'],'solver':['saga'],'C':np.geomspace(1e-6,100.0,9),\
                     'class_weight':[None,'balanced'],'l1_ratio':[.1,.3,.5,.7,.9]}]
     elif estim_name=='SGDRegressor':
         tuned_parameters = [{'loss':['squared_error','huber','epsilon_insensitive',\
@@ -274,7 +274,7 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
     elif estim_name=='TweedieRegressor':
         tuned_parameters = [{'power':[0,1,2,3],'alpha': [.001,.005,.01,.05,0.3,.5,.7,.9,1,5,10]}]
     elif estim_name=='GaussianNB':
-        tuned_parameters = [{'var_smoothing':[1e-10,1e-9,1e-8,1e-7,1e-6,1e-5,1e-4,1e-3,1e-2]}]
+        tuned_parameters = [{'var_smoothing':np.geomspace(1e-10,1e-2,9)}]
     elif estim_name=='BernoulliNB':
         tuned_parameters = [{'alpha': [1e-5, 1e-4, 1e-3, 1e-2,.1,1]}]
     elif estim_name=='KNeighborsRegressor' or estim_name=='KNeighborsClassifier':
@@ -305,16 +305,25 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
             'criterion': ['squared_error','friedman_mse','absolute_error','poisson']}]
 # ETC is incomplete
         elif estim_name=='ExtraTreesClassifier':
-            tuned_parameters = [{'max_depth':[None,1,2,3,4,5],'criterion':['gini','entropy'],\
-            'min_samples_split':[2,3,4,5,6],'min_samples_leaf':[2,3,4,5,6],\
-            'min_weight_fraction_leaf':[0.0,0.2,0.4,0.6,0.8],'max_features':['sqrt','log2',None]}]
+            tuned_parameters = {'max_depth':[None,1,2,3,4,5],'criterion':['gini','entropy'],
+            'min_samples_leaf':[3,5,10,15,20],
+            'min_samples_split':[8,10,12,18,20,16],
+            'min_weight_fraction_leaf':[0.0,0.2,0.4,0.6,0.8],
+            'max_features':['sqrt','log2',None]}
         elif estim_name=='DecisionTreeClassifier':
-            tuned_parameters = [{'splitter':['best'],'criterion':['gini','entropy'],\
-            'class_weight':['balanced',None],'ccp_alpha':[0.0,.5,1.0],\
-            'max_features':['auto','sqrt','log2',None]},
-            {'splitter': ['random'], 'criterion': ['gini','entropy'],\
-            'class_weight':['balanced',None],'ccp_alpha':[0.0,.5,1.0],\
-            'max_features':['auto','sqrt','log2',None]}]
+# Ideal: loose stopping criteria, good prunning to prevent overfitting.
+# More prunning = more general, less accurate
+# Stopping criteria: max_depth, min_samples_leaf, min_samples_split 
+# Prunning methods: min_weight_fraction_leaf, min_impurity_decrease
+            tuned_parameters = {'max_depth':[3,5,7,10],
+          'max_leaf_nodes':[3,5,10,15,20],
+          'min_samples_leaf':[1,3,5,10,15,20],
+          'min_samples_split':[8,10,12,18,20,16],
+          'min_weight_fraction_leaf':[0,0.3,0.6,0.9],
+          'min_impurity_decrease':[0,0.3,0.6,0.9],
+          'class_weight':[None,'balanced'],
+          'ccp_alpha':np.linspace(0,0.05,10),
+          'criterion':['gini','entropy','log_loss']}
     elif estim_name=='MLPRegressor' or estim_name=='MLPClassifier':
         tuned_parameters = [{'activation':['identity','logistic','tanh','relu'],
                     'learning_rate':['constant','invscaling','adaptive'],
@@ -341,6 +350,9 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
             print('\n ·',score,':',round(clf.score(x_test,y_test),4))
         print(results_df[['mean_test_score','std_test_score','mean_train_score','std_train_score']].head(1))
         print(clf.best_estimator_)
+# Save best estimator         
+        if score==ref_score and classification:
+            clf_best=clf.best_estimator_
 # Validation curve only if regularization parameter is defined for estimator
         key=None
         if estim_name == 'MLPClassifier' or estim_name == 'TweedieRegressor'\
@@ -387,13 +399,11 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
         plt.savefig(estim_name+'_cm.png')
         print()
     elif class_dim > 2:
-        clf = GridSearchCV(estimator, tuned_parameters,
-                scoring=ref_score,cv=cv,return_train_score=True)
-        clf.fit(x_train, y_train)
+        clf_best.fit(x_train, y_train)
         print('\n  ~~~ Multi-class classification problem ~~~')
         print('\n   - Using',ref_score,'as reference score metric\n')
 # Perform predict on the test set
-        y_predict=clf.predict(x_test)
+        y_predict=clf_best.predict(x_test)
 # Print the actual set of parameters after CV tuning
         y_test=y_test.to_numpy()
 # Plot confusion matrix for multilabel (labels passed in unique variable)
@@ -407,7 +417,7 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
             l_curve(clf.best_estimator_,i,estim_name,clf.best_params_,x,y,clf.best_score_,cv)
 # Perform CV with all the scoring functions, in order to remove random effects
 # on the evaluation of the accuracy of the model
-    predict_evaluate.cv_perform(clf.best_estimator_,x,y,cv,scores,classification,class_dim)
+    predict_evaluate.cv_perform(clf_best,x,y,cv,scores,classification,class_dim)
 # Obsolete: given by cross_validate
 # Perform predict on the test set
 #        y_predict=best_clf.predict(x_test)
@@ -442,7 +452,7 @@ def trainmod(x,y,feat_names,short_score,classification,estimator,cv):
                 estimators_list.append(SGDC(max_iter=10000))
             elif i == 'dt':
                 from sklearn.tree import DecisionTreeClassifier as DTC
-                estimators_list.append(DTC())
+                estimators_list.append(DTC(random_state=42))
             elif i == 'dt':
                 from sklearn.ensemble import ExtraTreesClassifier as ETC
                 estimators_list.append(ETC())
@@ -475,7 +485,7 @@ def trainmod(x,y,feat_names,short_score,classification,estimator,cv):
                 estimators_list.append(SGDR(max_iter=10000))
             elif i == 'dt':
                 from sklearn.tree import DecisionTreeRegressor as DTR
-                estimators_list.append(DTR())
+                estimators_list.append(DTR(random_state=42))
             elif i == 'gp':
                 from sklearn.gaussian_process import GaussianProcessRegressor as GPR
                 estimators_list.append(GPR(n_restarts_optimizer=0))
