@@ -1,6 +1,6 @@
 import pandas as pd
 from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler,MinMaxScaler
+from sklearn.preprocessing import StandardScaler,MinMaxScaler,PowerTransformer
 from sklearn.model_selection import KFold
 from importlib import import_module
 import sys,plot, train, tests, fs, al_boss, os,pp
@@ -89,10 +89,11 @@ for i in estimator:
     print('    ',i)
 
 # Create StandardScaler instance
-#sscaler=StandardScaler()
-sscaler=MinMaxScaler()
+#scal=StandardScaler()
+#scal=MinMaxScaler()
+scal=PowerTransformer()
 
-x=pd.read_csv(data_f)
+x=pd.read_csv(data_f,sep=',')
 # Loop over the columns that should be dropped
 for i in dropcols:
     x=x.drop(columns=[i])
@@ -104,7 +105,11 @@ n_feats=len(x.columns)
 
 # Plot data in histogram form
 if plot_dat_hist:
-    plot.plot_hist(x,bins,feat_names)
+    plot.plot_hist(x,bins,feat_names,scal=False)
+# If transformation, apply it and return back the labels
+    x_scal=scal.fit_transform(x)
+    x=pd.DataFrame(x_scal,index=x.index,columns=x.columns)
+    plot.plot_hist(x,bins,feat_names,scal=scal.__class__.__name__)
     if not plot_dat_scatter:
         exit()
 if plot_dat_scatter:
@@ -130,40 +135,45 @@ if var_thresh:
 # Drop them from the original dataset. Just to be able to recover the original tags
     for i in dropped:
         x=x.drop(columns=[i])
-# Perform standard scaling
-x_scal=sscaler.fit_transform(x)
+# Perform scaling
+if scal:
+    print('\n -> Using scaling:')
+    print('     ',scal.__class__.__name__)
+    x_scal=scal.fit_transform(x)
 # Tag back the columns after scaling
-x_scal=pd.DataFrame(x_scal,index=x.index,columns=x.columns)
+    x=pd.DataFrame(x_scal,index=x.index,columns=x.columns)
 
 # Perform PCA analysis and choose the most relevant components
 # if crit (second argument) is integer -> perform PCA with crit number of components
 # if crit is float -> perform PCA until crit variance is explained
 # components
 if pca_expl_var != 0:
-    x=plot.pca_feat(x_scal,pca_expl_var,True)
+    x=plot.pca_feat(x,pca_expl_var,True)
 # Perform UMAP dim reduction and plot it (coloured with the results)
 if umap:
-    plot.umap(x_scal,y)
+    plot.umap(x,y)
 # Perform train and test similarity tests
 if simil_test: 
     print('\n-> Performing similarty tests')
-    tests.rf_diff_dist(x_scal,y,yname)
-    tests.ks(x_scal,y)
+    tests.rf_diff_dist(x,y,yname)
+    tests.ks(x,y)
 ##tests.mahalanobis(x,y)
 
 # Perform feature selection
 if feat_sel:
     print('\n-> Performing feature selection')
 # Perform MI and F-reg. Select according to SelectKBest
-    fs.skb(x_scal,y,feat_names,short_score,classification,estimator,cv)
+    fs.skb(x,y,feat_names,short_score,classification,estimator,cv)
 # Perform recursive feature elimination with cross-validation
-    fs.rfecv(x_scal,y,feat_names,short_score,classification,estimator,cv)
+    fs.rfecv(x,y,feat_names,short_score,classification,estimator,cv)
 
 if n_feats > x.shape[1]:
     print('\n  Applied feature reduction')
     print('   Reduced from ',n_feats,' to ',x.shape[1],' features')
 
-print('\n -> Modelling with ',x.shape[1],' features')
+print('\n -> Modelling with the following',x.shape[1],'features:')
+for i in feat_names:
+    print('     ', i)
 # If it is no active learning task, train models and get scores. x,y are not scaled
 train.trainmod(x,y,feat_names,short_score,classification,estimator,cv)
 

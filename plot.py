@@ -5,7 +5,22 @@ from sklearn.decomposition import PCA
 from umap import UMAP
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
-from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
+from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix,\
+roc_curve,auc
+
+small = 8
+medium = 13
+large = 20
+
+plt.rc('font', size=large)          # controls default text sizes
+plt.rc('axes', titlesize=large)     # fontsize of the axes title
+plt.rc('axes', labelsize=large)    # fontsize of the x and y labels
+plt.rc('xtick', labelsize=large)    # fontsize of the tick labels
+plt.rc('ytick', labelsize=large)    # fontsize of the tick labels
+plt.rc('legend', fontsize=large)    # legend fontsize
+plt.rc('figure', titlesize=large)  # fontsize of the figure title
+plt.rc('figure', labelsize=large)  # fontsize of the figure title
+
 # Perform PCA component analysis
 def pca_feat(x,crit,v):
 # If an integer is given, perform PCA for crit number of components
@@ -52,12 +67,18 @@ def umap(x,y):
     plt.savefig('umap.png')
     plt.show()
 
-def plot_hist(x,bins,feat_names):
+def plot_hist(x,bins,feat_names,scal):
     for i in range(x.shape[1]):
         plt.hist(x[feat_names[i]],bins=bins)
         plt.xlabel(feat_names[i])
-        plt.savefig('hist_'+feat_names[i]+'.png')
+        plt.ylabel('# samples')
+        if scal:
+            plt.savefig('hist_'+feat_names[i]+'_'+scal+'.png')
+        else:
+            plt.savefig('hist_'+feat_names[i]+'.png')
+        plt.clf() 
         plt.close() 
+        plt.cla() 
 
 def plot_scatter(x,ref,feat_names):
     y=x.pop(ref)
@@ -84,3 +105,14 @@ def plot_confmat_multi(y_test,y_predict,estimator,unique):
 
     cmp.plot(ax=ax)
     plt.savefig('cf_'+str(estimator)+'.png');
+
+def plot_roc(y_test,y_predict,unique,estimator):
+    fpr,tpr,threshold=roc_curve(y_test,y_predict,pos_label='High')
+    roc_auc=auc(fpr,tpr)
+    plt.plot(fpr, tpr, label='AUC = %0.2f' % roc_auc)
+    plt.axis("square")
+    plt.xlabel('False'+unique[0]+' Rate')
+    plt.ylabel('True'+unique[1]+'  Rate')
+    plt.title('One-vs-Rest ROC curve:\nHigh vs (Setosa & Versicolor)')
+    plt.legend()
+    plt.savefig('roc_'+str(estimator)+'.png')

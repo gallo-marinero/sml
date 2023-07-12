@@ -1,5 +1,6 @@
 from sklearn.linear_model import LinearRegression as LR
 from sklearn.linear_model import TweedieRegressor as TR
+from sklearn.metrics import make_scorer, precision_score
 from sklearn.model_selection import train_test_split, cross_validate
 import math
 
@@ -15,46 +16,62 @@ def pred_eval(x,y,model):
 
 # Function for performing CV on the metrics for evaluation of model performance 
 def cv_perform(estimator,x,y,cv,scores,classification,class_dim):
+    custom=False
+# Loop over scores to check if there is custom score. If so, remove it,
+# otherwise cross_validate throws error
+    for i in scores:
+        if type(i) is dict:
+            custom=i
+            scores.remove(i)
     cv_score=cross_validate(estimator,x,y,cv=cv,scoring=scores,return_train_score=True)
     print('\n Estimator: ',estimator)
     print('\n Evaluating accuracy with CV')
     print('    {:20s} {:6s} {:6s} {:6s} {:6s}'.format('Score','Train','Std','Test','Std'))
-    print('    ----------------------------------')
+    print('    -------------------------------------------------')
 # Print actual set of parameters after CV tuning            
     if not classification:
         for i in scores:
             test_key='test_'+i
             train_key='train_'+i
             if 'neg_mean_squared_error' in i:
-                print('    {:20s} {:6.3f}{:6.3f}{:6.3f}{:6.3f}'.format('RMSE',
+                print('    {:20s} {:6.3f}{:6.3f} {:6.3f}{:6.3f}'.format('RMSE',
             round(math.sqrt(abs(cv_score[train_key].mean())),3),\
             round(math.sqrt(abs(cv_score[train_key].std())),3),\
             round(math.sqrt(abs(cv_score[test_key].mean())),3),\
             round(math.sqrt(abs(cv_score[test_key].std())),3)))
             elif 'neg_mean_absolute_error' in i:
-                print('    {:20s} {:6.3f}{:6.3f}{:6.3f}{:6.3f}'.format('MAE',
+                print('    {:20s} {:6.3f}{:6.3f} {:6.3f}{:6.3f}'.format('MAE',
             round(abs(cv_score[train_key].mean()),3),round(cv_score[train_key].std(),3),
             round(abs(cv_score[test_key].mean()),3),round(cv_score[test_key].std(),3)))
             elif 'neg_mean_absolute_percentage_error' in i:
-                print('    {:20s} {:6.3f}{:6.3f}{:6.3f}{:6.3f}'.format('MA%E',
+                print('    {:20s} {:6.3f}{:6.3f} {:6.3f}{:6.3f}'.format('MA%E',
             round(abs(cv_score[train_key].mean())*100,3),round(cv_score[train_key].std()*100,3),
             round(abs(cv_score[test_key].mean())*100,3),round(cv_score[test_key].std()*100,3)))
             elif 'max_error' in i:
-                print('    {:20s} {:6.3f}{:6.3f}{:6.3f}{:6.3f}'.format('Max error',
+                print('    {:20s} {:6.3f}{:6.3f} {:6.3f}{:6.3f}'.format('Max error',
             round(abs(cv_score[train_key].mean()),3),round(cv_score[train_key].std(),3),
             round(abs(cv_score[test_key].mean()),3),round(cv_score[test_key].std(),3)))
             elif 'explained_variance' in i:
-                print('    {:20s} {:6.3f}{:6.3f}{:6.3f}{:6.3f}'.format('Exp var',
+                print('    {:20s} {:6.3f}{:6.3f} {:6.3f}{:6.3f}'.format('Exp var',
             round(abs(cv_score[train_key].mean()),3),round(cv_score[train_key].std(),3),
             round(abs(cv_score[test_key].mean()),3),round(cv_score[test_key].std(),3)))
             else:
-                print('    {:20s} {:6.3f}{:6.3f}{:6.3f}{:6.3f}'.format(i,
+                print('    {:20s} {:6.3f}{:6.3f} {:6.3f}{:6.3f}'.format(i,
             round(cv_score[train_key].mean(),3),round(cv_score[train_key].std(),3),
             round(cv_score[test_key].mean(),3),round(cv_score[test_key].std(),3)))
-    elif class_dim > 2:
+#    elif class_dim > 2:
+    else:
         for i in scores:
             test_key='test_'+i
             train_key='train_'+i
-            print('    {:20s} {:6.3f}{:6.3f}{:6.3f}{:6.3f}'.format(i,
+            print('    {:20s} {:6.3f}{:6.3f} {:6.3f}{:6.3f}'.format(i,
+            round(cv_score[train_key].mean(),3),round(cv_score[train_key].std(),3),
+            round(cv_score[test_key].mean(),3),round(cv_score[test_key].std(),3)))
+# Create special instance for custom scores (only for multiclass by now
+        if custom:
+            cv_score=cross_validate(estimator,x,y,cv=cv,scoring=custom,return_train_score=True)
+            test_key='test_custom_score'
+            train_key='train_custom_score'
+            print('    {:20s} {:6.3f}{:6.3f} {:6.3f}{:6.3f}'.format('custom_score',
             round(cv_score[train_key].mean(),3),round(cv_score[train_key].std(),3),
             round(cv_score[test_key].mean(),3),round(cv_score[test_key].std(),3)))
