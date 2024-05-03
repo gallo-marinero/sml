@@ -1,8 +1,26 @@
+from sklearn.preprocessing import LabelEncoder
 from sklearn.linear_model import LinearRegression as LR
 from sklearn.linear_model import TweedieRegressor as TR
 from sklearn.metrics import make_scorer, precision_score
 from sklearn.model_selection import train_test_split, cross_validate
+from mlxtend.evaluate import bias_variance_decomp
 import math
+
+# Calculate bias and variance (as an estimation of over- and underfitting)
+def interpret(model,x_train,y_train,x_test,y_test,classification,feat_names,estimator):
+    if classification:
+        loss='0-1_loss'
+# Encode the text labels to integers        
+        y_train=LabelEncoder().fit_transform(y_train)
+        y_test=LabelEncoder().fit_transform(y_test)
+    else:
+        loss='mse'
+    avg_expected_loss, avg_bias, avg_var = bias_variance_decomp(model,
+            x_train, y_train, x_test, y_test, loss=loss, num_rounds=50, random_seed=1)
+    print('\n Over/underfitting evaluaton')
+    print(f"    Average expected loss: {avg_expected_loss.round(3)}")
+    print(f"    Average bias: {avg_bias.round(3)}")
+    print(f"    Average variance: {avg_var.round(3)}")
 
 def pred_eval(x,y,model):
     x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2,random_state=42)

@@ -2,9 +2,9 @@ import pandas as pd
 from os.path import exists
 import numpy as np
 from sklearn.decomposition import PCA
-from umap import UMAP
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
+from mlxtend.plotting import plot_pca_correlation_graph
 from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix,\
 roc_curve,auc
 
@@ -20,6 +20,36 @@ plt.rc('ytick', labelsize=large)    # fontsize of the tick labels
 plt.rc('legend', fontsize=large)    # legend fontsize
 plt.rc('figure', titlesize=large)  # fontsize of the figure title
 plt.rc('figure', labelsize=large)  # fontsize of the figure title
+
+def importance_bar(feat_names,importance):
+    print('      Feature      Score')
+    for i,v in enumerate(importance):
+        print(' %15s   %.5f' % (feat_names[i],v))
+# plot feature importance
+    fig, ax = plt.subplots()
+
+    y_pos=np.arange(len(feat_names))
+    hbars = ax.barh(y_pos, importance, align='center')
+    ax.set_yticks(y_pos, labels=feat_names)
+    ax.invert_yaxis()  # labels read top-to-bottom
+    ax.set_xlabel('Importance')
+#    ax.set_title('How fast do you want to go today?')
+
+# Label with specially formatted floats
+    ax.bar_label(hbars, fmt='%.2f')
+    ax.set_xlim(left=min(importance)-6,right=max(importance)+6)  # adjust xlim to fit labels
+    plt.savefig('importance.png',bbox_inches='tight')
+
+
+def correlation_circle(x,feat_names,estimator):
+    print('\n -> Plotting correlation circle to correlation_circle.png')
+    figure, correlation_matrix = plot_pca_correlation_graph(x, feat_names,\
+                                dimensions=(1, 2),figure_axis_size=10)
+    print(correlation_matrix)
+    plt.title('')
+    plt.savefig('correlation_circle.png')
+    plt.close()
+    plt.clf()
 
 # Perform PCA component analysis
 def pca_feat(x,crit,v):
@@ -50,6 +80,7 @@ def pca_feat(x,crit,v):
     plt.clf()
     return x_pca
 
+'''
 def umap(x,y):
     print('\n-> Applying UMAP dimensionality reduction')
 #    plt.title(title)
@@ -66,6 +97,7 @@ def umap(x,y):
 #    plt.text(min(dat_reduced[:, 0])-.2,max(dat_reduced[:, 1])-1.5,'Inlier', color=colors[1])
     plt.savefig('umap.png')
     plt.show()
+'''
 
 def plot_hist(x,bins,feat_names,scal):
     for i in range(x.shape[1]):

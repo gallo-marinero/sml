@@ -51,7 +51,7 @@ def plot_skb(x_train,y_train,x_test):
         plt.savefig(title+'_mfs.png')
         plt.clf()
 
-def skb_bestk(x,y,k,model,score_f,feat_names,short_score,classification,estimator,cv):
+def skb_bestk(x,y,k,model,score_f,feat_names,short_score,classification,estimator,cv,scal):
     print('\n Best configuration with',k,'features:')
     print('   ID     Name        Score')
     skb = SelectKBest(score_func=score_f,k=k)
@@ -61,10 +61,10 @@ def skb_bestk(x,y,k,model,score_f,feat_names,short_score,classification,estimato
     for i in range(len(skb.scores_)-1,len(skb.scores_)-k-1,-1):
         print('   {0:2} {1:13s} {2:7.3f}'.format(scores[i],feat_names[scores[i]],skb.scores_[scores[i]]))
     print('\n   Training with',k,'features:')
-    train.trainmod(x_skb,y,feat_names,short_score,classification,estimator,cv)
+    train.trainmod(x_skb,y,feat_names,short_score,classification,estimator,cv,scal)
             
 
-def skb(x,y,feat_names,short_score,classification,estimator,cv):
+def skb(x,y,feat_names,short_score,classification,estimator,cv,scal):
 # Define the evaluation method and model
     model=TR(power=0,max_iter=2000)
     for i in range(3):
@@ -119,9 +119,9 @@ def skb(x,y,feat_names,short_score,classification,estimator,cv):
             for mean, param in zip(means, params):
                 print("   %.3f with: %r" % (mean, param['sel__k']))
             
-            skb_bestk(x,y,results.best_params_['sel__k'],model,score_f,feat_names,short_score,classification,estimator,cv)
+            skb_bestk(x,y,results.best_params_['sel__k'],model,score_f,feat_names,short_score,classification,estimator,cv,scal)
 
-def rfecv(x,y,feat_names,short_score,classification,estimator,cv):
+def rfecv(x,y,feat_names,short_score,classification,estimator,cv,scal):
     print('\n\n ~ Recursive feature elimination with cross-validation ~ ')
     model = TR(max_iter=2000)
     rfecv = RFECV(estimator=model,cv=cv)#,n_features_to_select=i)
@@ -132,7 +132,7 @@ def rfecv(x,y,feat_names,short_score,classification,estimator,cv):
             print('   {0:2} {1:13s} {2:7.3f}'.format(i,feat_names[i],rfecv.cv_results_['mean_test_score'][i]))
 
     print('\n   Training with',rfecv.n_features_,'features:')
-    train.trainmod(x_rfecv,y,feat_names,short_score,classification,estimator,cv)
+    train.trainmod(x_rfecv,y,feat_names,short_score,classification,estimator,cv,scal)
 #    pipeline = Pipeline(steps=[('s',rfe),('m',model)])
 #    n_scores = cross_val_score(pipeline, x, y, scoring='neg_mean_absolute_error', cv=cv, n_jobs=-1, error_score='raise')
 #    print('  %i   %.3f   (%.3f)' % (rfe.n_features_, mean(n_scores), std(n_scores)))

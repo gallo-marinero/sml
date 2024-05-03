@@ -1,21 +1,27 @@
 import pandas as pd
+from datetime import datetime
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler,MinMaxScaler,PowerTransformer
 from sklearn.model_selection import KFold
 from importlib import import_module
-import sys,plot, train, tests, fs, al_boss, os,pp
+import sys,plot, train, tests, fs, al_boss, os,pp, load_predict
 #from umap import UMAP
 
 # Define input variables
-vrbls=['classification','al','estimator','var_thresh','feat_sel',\
-        'bins','plot_dat_hist','umap','simil_test','spline_knots',\
-        'feat_names','short_score','yname','dropcols','data_f','gen_feat',\
+vrbls=['classification','model_joblib','gen_data','n_points','al','estimator','var_thresh','feat_sel',
+        'bins','plot_dat_hist','correlation_circle','umap','simil_test','spline_knots',
+        'feat_names','short_score','yname','dropcols','data_f','gen_feat','target_property',
         'pca_expl_var']
 
 # ~ Defaults definition~
 # Regression problem by default
 classification=False
 al=False
+# Predict with 'model_joblib' previously trained model false by default
+model_joblib=False
+# Generate input data for prediction with loaded module
+gen_data=False
+n_points=0
 # Available estimators:
 # Linear Regression (Tweedie Regressor): linr
 # K-Nearest Neighbors: knn
@@ -37,6 +43,10 @@ spline_knots=False
 var_thresh=False
 # Perform feature selection
 feat_sel=False
+# Plot correlation circle
+correlation_circle=True
+# Target property (defines classification problem)
+target_property=False
 # Plot data in histograms
 plot_dat_hist=False
 bins=10
@@ -67,6 +77,8 @@ for i in vrbls:
 # Update variable
         globals()[i] = getattr(inp_f,i)
 
+print('\n     --- Executed on',datetime.now().strftime("%d/%m/%Y %H:%M:%S"),'---')
+
 if al:
     print('\n     ~ Active learning task ~')
     print('\n     ------------------------\n')
@@ -82,11 +94,11 @@ else:
 print('\n -> Reading the data from', data_f)
 print('\n -> Modelling \'', yname, '\' variable')
 print('\n -> Droping features: ')
-for i in dropcols:
-    print('    ',i)
-print('\n -> Using estimator: ')
-for i in estimator:
-    print('    ',i)
+for i in dropcols: print('    ',i)
+if not model_joblib:
+    print('\n -> Using estimator: ')
+    for i in estimator:
+        print('    ',i)
 
 # Create StandardScaler instance
 #scal=StandardScaler()
@@ -97,6 +109,13 @@ x=pd.read_csv(data_f,sep=',')
 # Loop over the columns that should be dropped
 for i in dropcols:
     x=x.drop(columns=[i])
+
+# Print scaling applied (it is applied later on in train.py routine)
+if scal:
+    print('\n -> Using scaling:')
+    print('    ',scal.__class__.__name__)
+    if not classification:
+        print('     Applying transformation of the target')
 # Pop the column that is the output and assign it to y
 y=x.pop(yname)
 # Store the name of the columns in a list (useful for plotting e.g.: feature_importances_)
@@ -135,13 +154,6 @@ if var_thresh:
 # Drop them from the original dataset. Just to be able to recover the original tags
     for i in dropped:
         x=x.drop(columns=[i])
-# Perform scaling
-if scal:
-    print('\n -> Using scaling:')
-    print('     ',scal.__class__.__name__)
-    x_scal=scal.fit_transform(x)
-# Tag back the columns after scaling
-    x=pd.DataFrame(x_scal,index=x.index,columns=x.columns)
 
 # Perform PCA analysis and choose the most relevant components
 # if crit (second argument) is integer -> perform PCA with crit number of components
@@ -161,11 +173,17 @@ if simil_test:
 
 # Perform feature selection
 if feat_sel:
+    y=y.to_numpy()
     print('\n-> Performing feature selection')
 # Perform MI and F-reg. Select according to SelectKBest
-    fs.skb(x,y,feat_names,short_score,classification,estimator,cv)
+    fs.skb(x,y,feat_names,short_score,classification,estimator,cv,scal)
 # Perform recursive feature elimination with cross-validation
-    fs.rfecv(x,y,feat_names,short_score,classification,estimator,cv)
+    fs.rfecv(x,y,feat_names,short_score,classification,estimator,cv,scal)
+
+if correlation_circle:
+# Print correlation circle from mlxtend
+#    x_scal=scal.fit_transform(x)
+    plot.correlation_circle(x,feat_names,estimator)
 
 if n_feats > x.shape[1]:
     print('\n  Applied feature reduction')
@@ -174,8 +192,18 @@ if n_feats > x.shape[1]:
 print('\n -> Modelling with the following',x.shape[1],'features:')
 for i in feat_names:
     print('     ', i)
-# If it is no active learning task, train models and get scores. x,y are not scaled
-train.trainmod(x,y,feat_names,short_score,classification,estimator,cv)
+
+# Load joblib model and use it to calculate new samples
+if model_joblib:
+    model = load_predict.load(model_joblib)
+    if gen_data:
+        load_predict.gen_data(x,y,gen_data,yname,feat_names,n_points,model,target_property)
+    exit()
+# Transform dataset to numpy array
+x=x.to_numpy()
+y=y.to_numpy()
+# If it is no active learning task, train models and get scores
+train.trainmod(x,y,feat_names,short_score,classification,estimator,cv,scal)
 
 # Evaluate model
 ##predict_evaluate.pred_eval(x,y,model)

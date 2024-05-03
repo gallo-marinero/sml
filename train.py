@@ -1,17 +1,20 @@
 import numpy as np 
 from scipy.stats import t
+from sklearn.svm import SVR
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import StandardScaler,PowerTransformer
 from sklearn.model_selection import train_test_split, KFold, GridSearchCV,\
-validation_curve,learning_curve,ShuffleSplit,LeaveOneOut,LearningCurveDisplay
+validation_curve,learning_curve,ShuffleSplit,LeaveOneOut,LearningCurveDisplay,cross_val_score
+from sklearn.preprocessing import StandardScaler,MinMaxScaler,PowerTransformer
 from sklearn import svm
 from sklearn.gaussian_process.kernels import RBF,DotProduct,ConstantKernel,Matern,RationalQuadratic,ExpSineSquared
 from sklearn.metrics import mean_tweedie_deviance,\
 make_scorer,confusion_matrix,ConfusionMatrixDisplay,precision_score,f1_score
+from sklearn.compose import TransformedTargetRegressor
+from sklearn.pipeline import Pipeline
 from sklearn import metrics
 from sklearn.decomposition import PCA
 import pandas as pd
-import math, predict_evaluate, plot, pickle
+import math, predict_evaluate, plot, joblib, load_predict
 
 small = 8
 medium = 13
@@ -95,7 +98,7 @@ def l_curve(estim,score,estim_name,params,x,y,best_score,cv):
     axes[2].set_ylabel(str(score))
     axes[2].set_title("Performance of the model")
     if estim_name == 'TweedieRegressor':
-        plt.savefig(estim_name+'_power'+str(estim.get_params()['power'])+'_'+str(score)+'_lc.png')
+        plt.savefig(estim_name+'_power'+str(estim.get_params()['regressor__model__power'])+'_'+str(score)+'_lc.png')
     else:
         plt.savefig(estim_name+'_'+str(score)+'_lc.png')
     plt.clf()
@@ -225,7 +228,7 @@ def covar_print(results_df,score,estim_name):
     print(f"Correlation of models:\n {model_scores.transpose().corr()}")
 
 def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
-        short_score,classification,class_dim,cv,unique):
+        short_score,classification,class_dim,cv,unique,scal):
 # By default, no custom score and no reference scores are defined
     custom_score=False
     ref_score=False
@@ -249,8 +252,8 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
 #            train_scores=['balanced_accuracy','accuracy','f1_weighted',\
 #             'precision_weighted','recall_weighted']
 # Declare scoring used as reference score
-#            ref_score=custom_score
-            ref_score='f1_weighted'
+            ref_score=custom_score
+#            ref_score='f1_weighted'
 # Scores for regression fit
     else:
 # If short_score=True, evaluate only scores. If False, also neg
@@ -267,9 +270,18 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
         if not short_score:
             train_scores=train_scores+neg
     estim_name=estimator.__class__.__name__
-    if estim_name=='SVR' or estim_name=='SVC':
-        tuned_parameters = [{'kernel': ['rbf','linear','sigmoid'],'C': [.001,.01,.1,1, 10, 100, 1000]},
-                            {'kernel': ['poly'],'C':[.001,.01,.1,1, 10, 100], 'degree': [1,2,3,4,5]}]
+    if estim_name=='SVR':
+        tuned_parameters = [{'regressor__model__kernel': ['rbf','linear','sigmoid'],
+            'regressor__model__C': [.001,.01,.1,1, 10, 100, 1000]},
+            {'regressor__model__kernel': ['poly'],
+            'regressor__model__C':[.001,.01,.1,1, 10, 100],
+            'regressor__model__degree': [1,2,3,4,5]}]
+    elif estim_name=='SVC':
+        tuned_parameters = [{'model__kernel': ['rbf','linear','sigmoid'],
+            'model__C': [.001,.01,.1,1, 10, 100, 1000]},
+            {'model__kernel': ['poly'],
+            'model__C':[.001,.01,.1,1, 10, 100],
+            'model__degree': [1,2,3,4,5]}]
     elif estim_name=='GaussianProcessRegressor' or estim_name=='GaussianProcessClassifier':
         rbf=RBF()
         ck=ConstantKernel()
@@ -281,13 +293,15 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
 #                'lbfgs','sag','saga'],'class_weight':['balanced',None]},
 #        {'penalty':['l1'],'solver':['liblinear','saga'],'class_weight':['balanced',None]},
 #        {'penalty':['elasticnet'],'class_weight':['balanced',None]}]
-        tuned_parameters = [{'penalty':['l2'],\
-                'solver':['liblinear','newton-cholesky','newton-cg','lbfgs','sag','saga'],\
-                'class_weight':[None,'balanced'],'C':np.geomspace(1e-6,100.0,9)},\
-        {'penalty':['l1'],'solver':['liblinear','saga'],'C':np.geomspace(1e-6,100.0,9),\
-                    'class_weight':[None,'balanced']},
-        {'penalty':['elasticnet'],'solver':['saga'],'C':np.geomspace(1e-6,100.0,9),\
-                    'class_weight':[None,'balanced'],'l1_ratio':[.1,.3,.5,.7,.9]}]
+        tuned_parameters = [{'model__penalty':['l2'],
+            'model__solver':['liblinear','newton-cholesky','newton-cg','lbfgs','sag','saga'],
+            'model__class_weight':[None,'balanced'],'model__C':np.geomspace(1e-6,100.0,9)},
+        {'model__penalty':['l1'],
+            'model__solver':['liblinear','saga'], 'model__C':np.geomspace(1e-6,100.0,9),\
+            'model__class_weight':[None,'balanced']},
+        {'model__penalty':['elasticnet'],
+            'model__solver':['saga'], 'model__C':np.geomspace(1e-6,100.0,9),\
+            'model__class_weight':[None,'balanced'], 'model__l1_ratio':[.1,.3,.5,.7,.9]}]
     elif estim_name=='SGDRegressor':
         tuned_parameters = [{'loss':['squared_error','huber','epsilon_insensitive',\
                     'squared_epsilon_insensitive'],\
@@ -298,14 +312,19 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
                         'alpha': [1e-5, 1e-4, 1e-3, 1e-2,.1,1],\
                         'learning_rate': ['constant','optimal','invscaling','adaptive']}]
     elif estim_name=='TweedieRegressor':
-        tuned_parameters = [{'power':[0,1,2,3],'alpha': [.001,.005,.01,.05,0.3,.5,.7,.9,1,5,10]}]
+        tuned_parameters = [{'regressor__model__power':[0,1,2,3],\
+          'regressor__model__alpha': [.001,.005,.01,.05,0.3,.5,.7,.9,1,5,10]}]
     elif estim_name=='GaussianNB':
         tuned_parameters = [{'var_smoothing':np.geomspace(1e-10,1e-2,9)}]
     elif estim_name=='BernoulliNB':
         tuned_parameters = [{'alpha': [1e-5, 1e-4, 1e-3, 1e-2,.1,1]}]
-    elif estim_name=='KNeighborsRegressor' or estim_name=='KNeighborsClassifier':
-        tuned_parameters = [{'n_neighbors':[4,5,6,8,10,12,14,16,18],\
-        'metric':['cityblock','cosine','minkowsky','euclidean','haversine',\
+    elif estim_name=='KNeighborsRegressor':
+        tuned_parameters = [{'regressor__model__n_neighbors':[4,5,6,8,10,12,14,16,18],\
+        'regressor__model__metric':['cityblock','cosine','minkowsky','euclidean','haversine',\
+        'l1','l2','manhattan','nan_euclidean']}]
+    elif estim_name=='KNeighborsClassifier':
+        tuned_parameters = [{'model__n_neighbors':[4,5,6,8,10,12,14,16,18],\
+        'model__metric':['cityblock','cosine','minkowsky','euclidean','haversine',\
         'l1','l2','manhattan','nan_euclidean']}]
     elif estim_name=='DecisionTreeRegressor' or estim_name=='DecisionTreeClassifier':
 # Evaluate, in case of Decision Tree, the feature importances
@@ -354,10 +373,14 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
           'class_weight':[None,'balanced'],
           'ccp_alpha':np.linspace(0,0.04,8)}
 #          'criterion':['gini','entropy','log_loss']}
-    elif estim_name=='MLPRegressor' or estim_name=='MLPClassifier':
-        tuned_parameters = [{'activation':['identity','logistic','tanh','relu'],
-                    'learning_rate':['constant','invscaling','adaptive'],
-            'alpha': [0,.001,.005,.01,.05,.1,.5,1,5,10]}]
+    elif estim_name=='MLPRegressor':
+        tuned_parameters = [{'regressor__model__activation':['identity','logistic','tanh','relu'],
+                    'regressor__model__learning_rate':['constant','invscaling','adaptive'],
+            'regressor__model__alpha': [0,.001,.005,.01,.05,.1,.5,1,5,10]}]
+    elif estim_name=='MLPClassifier':
+        tuned_parameters = [{'model__activation':['identity','logistic','tanh','relu'],
+                    'model__learning_rate':['constant','invscaling','adaptive'],
+            'model__alpha': [0,.001,.005,.01,.05,.1,.5,1,5,10]}]
 
 # Perform cross_validate for all scores    
     scores=train_scores
@@ -366,8 +389,19 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
         train_scores=[ref_score]
 # Loop over all scorers defined for training
     for score in train_scores:
-        clf = GridSearchCV(estimator, tuned_parameters,
+# Define a pipeline for scaling of input variables        
+        pipeline = Pipeline([('scale',scal),('model', estimator)])
+        if not classification:
+# Transform target variable too with the same transformer as the input variables
+# (only for regression tasks)
+            reg_estimator=TransformedTargetRegressor(regressor=pipeline,transformer=scal)
+        else:
+# In case of classification, perform scaling but not on the target
+            reg_estimator=pipeline
+# Perform grid search for the best hyperparameter set with CV
+        clf = GridSearchCV(reg_estimator, tuned_parameters,
                 scoring=score,cv=cv,return_train_score=True)
+# Fit the model with the best hyperparameter set
         clf.fit(x_train, y_train)
 # Prepare the dataframe with results, to print the mean and standard deviation
 # of the test score for the best set of parameters
@@ -392,10 +426,10 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
             key='alpha'
         elif estim_name == 'SVC' or estim_name=='LogisticRegressor':
             key='C'
-        if key:
-            if score == 'neg_mean_squared_error' or score == 'r2'\
-            or score == 'f1_weighted':
-                val_curve(clf.best_estimator_,score,estim_name,key,x,y,cv)
+##        if key:
+##            if score == 'neg_mean_squared_error' or score == 'r2'\
+##            or score == 'f1_weighted':
+##                val_curve(clf.best_estimator_,score,estim_name,key,x,y,cv)
 
 # Function to print the score with respect to the fold: informs whether the
 # results are dependent on the fold
@@ -436,13 +470,17 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
             scores[0]={'custom_score':custom_score}
         print()
     elif class_dim > 2:
+        if estim_name=='LogisticRegression':
+# Calculate importance of the features from .coef_ attribute
+            importance=clf_best.named_steps['model'].coef_[0]
+# Print and plot importances in bar chart
+            plot.importance_bar(feat_names,importance)
         clf_best.fit(x_train, y_train)
         print('\n  ~~~ Multi-class classification problem ~~~')
         print('\n   - Using',ref_score,'as reference score metric\n')
 # Perform predict on the test set
         y_predict=clf_best.predict(x_test)
 # Print the actual set of parameters after CV tuning
-        y_test=y_test.to_numpy()
 # If there is a custom score, convert it to dictionary to be able to perform
 # cross_validate
         if custom_score:
@@ -455,14 +493,16 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
 # Learning curve with optimal hyperparameters and for loss/r2 scoring functions
         score_lc=['neg_mean_squared_error','r2']
         for i in score_lc:
-            l_curve(clf.best_estimator_,i,estim_name,clf.best_params_,x,y,clf.best_score_,cv)
+            l_curve(clf_best,i,estim_name,clf.best_params_,x,y,clf.best_score_,cv)
 # Perform CV with all the scoring functions, in order to remove random effects
 # on the evaluation of the accuracy of the model
     predict_evaluate.cv_perform(clf_best,x,y,cv,scores,classification,class_dim)
+# Interpret model with LIME
+    predict_evaluate.interpret(clf_best,x_train,y_train,x_test,y_test,classification,feat_names,estim_name)
 # Save model
-    model_filename = estim_name+'_model.sav'
-    pickle.dump(clf_best, open(model_filename,'wb'))
-    print('\n Model saved to',estim_name+'_model.sav')
+    model_filename = estim_name+'_model.joblib'
+    joblib.dump(clf_best, model_filename)
+    print('\n Model saved to',estim_name+'_model.joblib')
 # Perform predict on the test set
 ##    y_predict=clf_best.predict(x_test)
 ##    y_test=y_test.to_numpy()
@@ -476,7 +516,7 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
 ##        print('     MA%E', metrics.mean_absolute_percentage_error(y_test, y_predict))
     return clf.best_params_
 
-def trainmod(x,y,feat_names,short_score,classification,estimator,cv):
+def trainmod(x,y,feat_names,short_score,classification,estimator,cv,scal):
     estimators_list= []
     class_dim=0
     for i in estimator:
@@ -546,6 +586,13 @@ def trainmod(x,y,feat_names,short_score,classification,estimator,cv):
                 estimators_list.append(MLPR(random_state=42,solver='lbfgs'))
 # Create train and test sets from the original dataset
     x_train, x_test, y_train, y_test = train_test_split(x, y,test_size=.2, random_state=42)
+# Perform scaling only on x (y is transformed later for regression tasks)
+#    if scal:
+#        x_train = scal.fit_transform(x_train)
+#        x_test = scal.transform(x_test)
+#        x_train = scal.fit_transform(x_train)
+#        x_test = scal.transform(x_test)
+
     print('\n -> Tuning hyperparameters:')
     print('   All reported scores performed on the test set\n')
 #    estimators_list.append(TR(power=1))
@@ -563,4 +610,4 @@ def trainmod(x,y,feat_names,short_score,classification,estimator,cv):
         print('   Score:',i.score(x_test,y_test))
 # Perform cross-validation
         pars=gridsearchcv(i,x_train,y_train,x_test,y_test,x,y,feat_names,\
-        short_score,classification,class_dim,cv,unique)
+        short_score,classification,class_dim,cv,unique,scal)
