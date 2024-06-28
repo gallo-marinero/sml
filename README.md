@@ -30,28 +30,28 @@ involve modifiying some code files.
 Input is specified through a plain text file, although not all functionalities are accesible that way.
 
 Example of a regression model training input file:
-! classification=True                                              # Regression model by default
+<span>#</span> classification=True                                              # Regression model by default
 yname='am_loading'                                                 # Target variable
 dropcols=['name','shear_rate','am_loading_std']                    # Dropping some columns from the database
 data_f='23-01-23_cathode_am_mass_reg_rem_high.csv'                 # Data file
-! -- Model keyword description --
-! Linear regression (Tweedie Regressor - regression only): linr
-! K-Nearest Neighbors: knn
-! Support Vector Machine: svm
-! Stochastic Gradient Descent: sgd
-! Decission Tree: dt
-! Neural network: nn
-! Logistic Regression (classification only): lr
-! Gaussian Naive Bayes (classification only): gnb
-! Bernoulli Naive Bayes (classification only): bnb
-! Gaussian process: gp # NOT READY!
-! plot_dat_hist=True                                                # Plot histogram with raw data
-estimator=['svm']#,'sgd','linr','knn','svm']                        # Choose estimator(s)
-! pca_expl_var=.97                                                  # Perform explained variance task
-! feat_sel=True                                                     # Perform feature selection
+-- Model keyword description --
+Linear regression (Tweedie Regressor - regression only): linr
+<span>#</span> K-Nearest Neighbors: knn
+<span>#</span> Support Vector Machine: svm
+<span>#</span> Stochastic Gradient Descent: sgd
+<span>#</span> Decission Tree: dt
+<span>#</span> Neural network: nn
+<span>#</span> Logistic Regression (classification only): lr
+<span>#</span> Gaussian Naive Bayes (classification only): gnb
+<span>#</span> Bernoulli Naive Bayes (classification only): bnb
+<span>#</span> Gaussian process: gp # NOT READY!
+<span>#</span> plot_dat_hist=True                                                # Plot histogram with raw data
+estimator=['svm']<span>#</span>,'sgd','linr','knn','svm']                        # Choose estimator(s)
+<span>#</span> pca_expl_var=.97                                                  # Perform explained variance task
+<span>#</span> feat_sel=True                                                     # Perform feature selection
 correlation_plot=True                                               # Plot correlation circle
-! gen_feat=3                                                        # Generate # features
-! spline_knots=3                                                    # Generation features settings
+<span>#</span> gen_feat=3                                                        # Generate # features
+<span>#</span> spline_knots=3                                                    # Generation features settings
 
 
 Code in continuous development and more features are being added on demand.
