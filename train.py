@@ -276,6 +276,13 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
             {'regressor__model__kernel': ['poly'],
             'regressor__model__C':[.001,.01,.1,1, 10, 100],
             'regressor__model__degree': [1,2,3,4,5]}]
+    if estim_name=='RandomForestRegressor':
+        tuned_parameters = [{'regressor__model__bootstrap': [True, False],
+            'regressor__model__max_depth': [10, 20, 40, 60, 80, 100, None],
+            'regressor__model__max_features': ['auto', 'sqrt'],
+            'regressor__model__min_samples_leaf': [1, 2, 4],
+            'regressor__model__min_samples_split': [2, 5, 10],
+            'regressor__model__n_estimators': [100, 300, 600, 900, 1100, 1400, 1700, 2000]}]
     elif estim_name=='SVC':
         tuned_parameters = [{'model__kernel': ['rbf','linear','sigmoid'],
             'model__C': [.001,.01,.1,1, 10, 100, 1000]},
@@ -490,6 +497,13 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
         print('   - Confusion matrix plotted to cf_',estim_name+'.png')
 # In case it is a regression problem
     elif not classification:
+# If the estimator is a RF regressor, print the feature importances
+        if estim_name=='RandomForestRegressor':
+            print(' Printing RF feature importances\n')
+            importance=clf_best.regressor_.named_steps['model'].feature_importances_
+# Print and plot importances in bar chart
+            plot.importance_bar(feat_names,importance)
+            print('\n')
 # Learning curve with optimal hyperparameters and for loss/r2 scoring functions
         score_lc=['neg_mean_squared_error','r2']
         for i in score_lc:
@@ -584,6 +598,9 @@ def trainmod(x,y,feat_names,short_score,classification,estimator,cv,scal):
             elif i == 'nn':
                 from sklearn.neural_network import MLPRegressor as MLPR
                 estimators_list.append(MLPR(random_state=42,solver='lbfgs'))
+            elif i == 'rf':
+                from sklearn.ensemble import RandomForestRegressor as RFR
+                estimators_list.append(RFR(random_state=42))
 # Create train and test sets from the original dataset
     x_train, x_test, y_train, y_test = train_test_split(x, y,test_size=.2, random_state=42)
 # Perform scaling only on x (y is transformed later for regression tasks)

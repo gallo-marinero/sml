@@ -101,9 +101,9 @@ if not model_joblib:
         print('    ',i)
 
 # Create StandardScaler instance
-#scal=StandardScaler()
+scal=StandardScaler()
 #scal=MinMaxScaler()
-scal=PowerTransformer()
+#scal=PowerTransformer()
 
 x=pd.read_csv(data_f,sep=',')
 # Loop over the columns that should be dropped

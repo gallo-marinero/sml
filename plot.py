@@ -45,9 +45,9 @@ def correlation_circle(x,feat_names,estimator):
     print('\n -> Plotting correlation circle to correlation_circle.png')
     figure, correlation_matrix = plot_pca_correlation_graph(x, feat_names,\
                                 dimensions=(1, 2),figure_axis_size=10)
-    print(correlation_matrix)
     plt.title('')
     plt.savefig('correlation_circle.png')
+    plt.savefig('correlation_circle.pdf')
     plt.close()
     plt.clf()
 
