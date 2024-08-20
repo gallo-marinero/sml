@@ -13,8 +13,9 @@ from sklearn.compose import TransformedTargetRegressor
 from sklearn.pipeline import Pipeline
 from sklearn import metrics
 from sklearn.decomposition import PCA
+from sympy import *
 import pandas as pd
-import math, predict_evaluate, plot, joblib, load_predict
+import math, predict_evaluate, plot, joblib, load_predict, graphviz
 
 small = 8
 medium = 13
@@ -276,7 +277,7 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
             {'regressor__model__kernel': ['poly'],
             'regressor__model__C':[.001,.01,.1,1, 10, 100],
             'regressor__model__degree': [1,2,3,4,5]}]
-    if estim_name=='RandomForestRegressor':
+    elif estim_name=='RandomForestRegressor':
         tuned_parameters = [{'regressor__model__bootstrap': [True, False],
             'regressor__model__max_depth': [10, 20, 40, 60, 80, 100, None],
             'regressor__model__max_features': ['auto', 'sqrt'],
@@ -513,6 +514,12 @@ def gridsearchcv(estimator,x_train,y_train,x_test,y_test,x,y,feat_names,\
     predict_evaluate.cv_perform(clf_best,x,y,cv,scores,classification,class_dim)
 # Interpret model with LIME
     predict_evaluate.interpret(clf_best,x_train,y_train,x_test,y_test,classification,feat_names,estim_name)
+# Print the mathematical code of symbolic regressor and save figure
+    print('\n Mathematical expression of the symbolic regressor')
+    print(' ',clf_best.regressor_.named_steps['model']._program)
+    dot_data = clf_best.regressor_.named_steps['model']._program.export_graphviz()
+    graph = graphviz.Source(dot_data,filename='graph')
+    graph.render(directory='sr_output').replace('\\', '/')
 # Save model
     model_filename = estim_name+'_model.joblib'
     joblib.dump(clf_best, model_filename)
@@ -601,6 +608,15 @@ def trainmod(x,y,feat_names,short_score,classification,estimator,cv,scal):
             elif i == 'rf':
                 from sklearn.ensemble import RandomForestRegressor as RFR
                 estimators_list.append(RFR(random_state=42))
+            elif i == 'sr':
+                from gplearn.genetic import SymbolicRegressor as SR
+                function_set=['add','sub','mul','div','sqrt','abs','neg',
+                'inv','sin','cos','tan','log']
+                estimators_list.append(SR(random_state=42,stopping_criteria=0.01,
+                    p_crossover=0.7, p_subtree_mutation=0.1,p_hoist_mutation=0.05,
+                    max_samples=0.9, verbose=1,parsimony_coefficient=0.011,
+                    p_point_mutation=0.1,function_set=function_set,population_size=10000,
+                    generations=50,feature_names=feat_names))
 # Create train and test sets from the original dataset
     x_train, x_test, y_train, y_test = train_test_split(x, y,test_size=.2, random_state=42)
 # Perform scaling only on x (y is transformed later for regression tasks)
@@ -626,5 +642,17 @@ def trainmod(x,y,feat_names,short_score,classification,estimator,cv,scal):
         print('  ',i)
         print('   Score:',i.score(x_test,y_test))
 # Perform cross-validation
-        pars=gridsearchcv(i,x_train,y_train,x_test,y_test,x,y,feat_names,\
-        short_score,classification,class_dim,cv,unique,scal)
+        if 'SymbolicRegressor' not in estim_name:
+            pars=gridsearchcv(i,x_train,y_train,x_test,y_test,x,y,feat_names,\
+            short_score,classification,class_dim,cv,unique,scal)
+        else:
+            print('\n  Omitting Grid Search CV for Symbolic Regression')
+# Dictionary to simplify the output function of the SR
+            converter = {'sub':lambda x, y : x - y, 'div': lambda x, y : x/y,
+            'mul': lambda x, y : x*y, 'add': lambda x, y : x + y, 'neg': lambda x : -x,
+            'sin': lambda x : sin(x), 'cos': lambda x : cos(x), 'inv': lambda x : 1/x,
+            'sqrt': lambda x : x**0.5, 'log': lambda x : log(x),'abs': lambda x : abs(x),
+            'tan': lambda x : tan(x),'log': lambda x : log(x)}
+            next_e = sympify((i._program), locals=converter)
+            print('  Formulation of the result of the symbolic regression')
+            print('  ',next_e)
