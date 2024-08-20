@@ -5,9 +5,11 @@ Own-built code by Alfonso Gallo that allows for regression, binary and multiclas
 It accepts the following ML algorithms:
 - Linear regression (Logistic regression for classification tasks) (LinR)
 - Decission tree (DT)
+- Random Forest (RF)
 - k-Nearest Neighbours (kNN)
 - Support Vector Machine (SVM)
 - Neural Networks (NN)
+- Symbolic Regression (SR)
 - Principal Component Analysis (PCA)
 - Stochastic Gradient Descent: (SGD)
 - Gaussian Naive Bayes (GNB - only for classification)
